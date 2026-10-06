@@ -333,6 +333,32 @@
 
     .toast.show { opacity: 1; }
     .hint { padding: 8px 14px; font-size: 12px; color: #9ca3af; line-height: 1.7; }
+
+    .modal > h3 .xbtn {
+      float: right; border: 0; background: none; cursor: pointer;
+      font-size: 18px; line-height: 1; padding: 0 2px; color: #9ca3af;
+    }
+
+    .crow {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .crow:last-child { border-bottom: 0; }
+    .crow-k { flex: 1 1 auto; min-width: 0; }
+    .crow-k b { display: block; font-size: 13px; font-weight: 600; color: #111827; }
+    .crow-k em { display: block; font-style: normal; font-size: 11px; color: #9ca3af; }
+    .crow input[type=color] {
+      width: 46px; height: 30px; padding: 0; cursor: pointer;
+      border: 1px solid #e5e7eb; border-radius: 6px; background: #fff;
+    }
+    .crow-v {
+      font-family: Menlo, Consolas, monospace; font-size: 12px;
+      color: #6b7280; min-width: 70px; text-align: right;
+    }
+    .crow-id input[type=text] {
+      width: 148px; padding: 5px 8px; font-size: 12px;
+      border: 1px solid #e5e7eb; border-radius: 6px; color: #374151;
+    }
   </style>
 </head>
 
@@ -341,6 +367,7 @@
     <div class="brand">公众号排版<span>本地渲染 · 零成本 · 干净复制</span></div>
     <div class="spacer"></div>
     <select id="themeSel" title="选择主题"></select>
+    <button id="colorBtn">配色</button>
     <button id="aiBtn">AI 用法</button>
     <button id="sampleBtn">载入示例</button>
     <button id="copyBtn" class="primary" disabled>复制到公众号</button>
@@ -387,6 +414,22 @@
       </div>
     </div>
   </div>
+
+  <div class="mask" id="colorMask">
+    <div class="modal">
+      <h3>配色 · 改完即时预览<button id="colorClose" class="xbtn" title="关闭">×</button></h3>
+      <div class="body" id="colorBody"></div>
+      <div class="foot">
+        <span class="hint" style="padding:0;">只改主色系 —— 阴影、链接、加粗、渐变端点会自动跟着变</span>
+        <div class="spacer"></div>
+        <button id="colorImport">导入主题</button>
+        <button id="colorReset">重置</button>
+        <button id="colorExport" class="primary">导出主题文件</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="themeFile" accept=".js,.json" style="display:none;">
 
   <div class="toast" id="toast"></div>
 
@@ -553,9 +596,11 @@ END 分隔线单独一行写 ---，后面接 :::profile 作者卡收尾。
   <script src="../engine/clipboard.js"></script>
   <script src="../engine/render.js"></script>
 
-  <!-- 主题（由 check/build_theme_js.py 从 themes/*.json 生成） -->
+  <!-- 主题清单由 check/build_theme_js.py 生成；主题本体在下面按需动态加载。
+       所以「往 themes/ 丢一个新 JSON + 跑一次编译」就够，本文件不用改 ——
+       以前每加一套主题都得在这里手写一行 <script>，那是同一份信息写两遍。
+       file:// 下动态插入普通 script 不走 CORS，已实测可用。 -->
   <script src="../themes/index.js"></script>
-  <script src="../themes/blue-editorial.js"></script>
 
   <script>
     (function () {
@@ -666,16 +711,88 @@ END 分隔线单独一行写 ---，后面接 :::profile 作者卡收尾。
           + (it.n === '刊头卡' ? '。cover 留空会自动放占位图' : ''));
       }
 
-      // 主题下拉：丢个新 JSON 进 themes/ 再跑一次生成脚本，这里自动出现
-      order.forEach(function (id) {
-        if (!themes[id]) return;
-        var op = document.createElement('option');
-        op.value = id;
-        op.textContent = themes[id].name + ' · ' + id;
-        themeSel.appendChild(op);
-      });
+      /* ---------- 主题加载 ----------
+       *
+       * 以前每套主题都要在 HTML 里手写一行 <script src>，加一套主题就得改本文件，
+       * 这是「同一份信息写两遍」。现在只加载编译产物 themes/index.js（带 GZH_THEME_ORDER），
+       * 再按清单逐个动态插入 script —— 加主题只需「丢 JSON + 跑编译」。
+       * file:// 下动态插入普通 script 不走 CORS，已实测可用。
+       */
 
-      function currentTheme() { return themes[themeSel.value]; }
+      var LS_EXTRA = 'gzh.extraThemes';   // 导入过的主题 id 列表
+      var LS_THEME = 'gzh.theme.';        // 导入过的主题本体
+
+      // localStorage 在 file:// 下实测可写，但隐私模式下可能被禁 ——
+      // 存不下不该让整个工具挂掉，所以全部读写都吞掉异常。
+      function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+      function extraIds() {
+        try {
+          var arr = JSON.parse(lsGet(LS_EXTRA) || '[]');
+          return Array.isArray(arr) ? arr : [];
+        } catch (e) { return []; }
+      }
+
+      // 导入过的主题本体存在 localStorage，下次打开要还原；
+      // 若 themes/ 里已经有同名文件，优先用文件（文件是权威来源）
+      function restoreImported() {
+        extraIds().forEach(function (id) {
+          if (window.GZH_THEMES[id]) return;
+          var raw = lsGet(LS_THEME + id);
+          if (!raw) return;
+          try { window.GZH_THEMES[id] = JSON.parse(raw); } catch (e) {}
+        });
+      }
+
+      function loadThemeScripts(ids, done) {
+        var i = 0, missing = [];
+        (function next() {
+          if (i >= ids.length) { done(missing); return; }
+          var id = ids[i++];
+          var s = document.createElement('script');
+          s.src = '../themes/' + id + '.js';
+          s.onload = next;
+          s.onerror = function () { missing.push(id); next(); };
+          document.head.appendChild(s);
+        })();
+      }
+
+      function allThemeIds() {
+        var seen = {}, out = [];
+        (window.GZH_THEME_ORDER || []).concat(extraIds()).forEach(function (id) {
+          if (seen[id]) return;
+          seen[id] = 1;
+          out.push(id);
+        });
+        return out;
+      }
+
+      function buildThemeOptions() {
+        themes = window.GZH_THEMES || {};
+        var prev = themeSel.value;
+        themeSel.innerHTML = '';
+        allThemeIds().forEach(function (id) {
+          if (!themes[id]) return;
+          var op = document.createElement('option');
+          op.value = id;
+          op.textContent = themes[id].name + ' · ' + id;
+          themeSel.appendChild(op);
+        });
+        if (prev && themes[prev]) themeSel.value = prev;
+      }
+
+      /* 用户在配色面板里改过的值，单独存而不是写回原主题对象。
+       * 这样「切换主题」「重置」都只是动这一小块，原主题始终干净。 */
+      var overrides = {};
+
+      function currentTheme() {
+        var base = themes[themeSel.value];
+        if (!base || !Object.keys(overrides).length) return base;
+        var t = JSON.parse(JSON.stringify(base));
+        Object.keys(overrides).forEach(function (k) { t.tokens[k] = overrides[k]; });
+        return t;
+      }
 
       function render() {
         var md = mdEl.value;
@@ -688,11 +805,21 @@ END 分隔线单独一行写 ---，后面接 :::profile 作者卡收尾。
           return;
         }
 
+        var theme = currentTheme();
+        if (!theme) {
+          previewEl.innerHTML = '';
+          barEl.innerHTML = '';
+          issuesEl.innerHTML = '<div class="issue">还没有可用的主题。</div>';
+          currentHTML = '';
+          copyBtn.disabled = true;
+          return;
+        }
+
         var ast, ir, html;
         try {
           ast = window.GZH.parse(md);
           ir = window.GZH.toIR(ast);
-          html = window.GZH.render(ir, currentTheme());
+          html = window.GZH.render(ir, theme);
         } catch (e) {
           issuesEl.innerHTML = '<div class="issue">渲染失败：' + e.message + '</div>';
           currentHTML = '';
@@ -707,7 +834,6 @@ END 分隔线单独一行写 ---，后面接 :::profile 作者卡收尾。
         $('statBytes').textContent = html.length.toLocaleString() + ' 字节';
 
         // 体检
-        var theme = currentTheme();
         var v = window.GZH.verdict(window.GZH.metrics(html), theme.rules);
         var m = v.metrics;
 
@@ -824,8 +950,191 @@ END 分隔线单独一行写 ---，后面接 :::profile 作者卡收尾。
         toast('已载入示例，改一改就能看到实时变化');
       });
 
+      /* ---------- 配色面板 ----------
+       *
+       * 只暴露「跟主色走」的那几个 token，而不是把 15 个 token 全摊开：
+       * 阴影、链接、加粗、渐变端点都是引用，改主色它们自己会跟，
+       * 再给一遍旋钮只会让人不知道该动哪个。
+       */
+      var COLOR_KEYS = [
+        ['accent', '主色', '标题、序号、强调'],
+        ['accentSub', '副色', '次级强调'],
+        ['accentSoft', '浅底', '行内代码底色、卡片淡底'],
+        ['accentSoft2', '浅底 2', '更淡的底色'],
+        ['accentTint', '边框', '卡片描边'],
+        ['accentTint2', '下划线', '链接下划线'],
+        ['accentLine', '装饰线', '分隔线、渐变端点']
+      ];
+
+      var colorMask = $('colorMask'), colorBody = $('colorBody');
+
+      function openColor() {
+        var t = currentTheme();
+        if (!t) { toast('先选一个主题'); return; }
+
+        var html = '<p style="margin:0 0 12px;color:#6b7280;">改完右侧预览会立刻变。'
+          + '满意了就点「导出主题文件」，拿到的是一个能直接用的主题文件。</p>';
+
+        COLOR_KEYS.forEach(function (row) {
+          var key = row[0], label = row[1], note = row[2];
+          var val = (overrides[key] || t.tokens[key] || '#000000');
+          html += '<div class="crow">'
+            + '<span class="crow-k"><b>' + label + '</b><em>' + note + '</em></span>'
+            + '<input type="color" value="' + val + '" data-k="' + key + '">'
+            + '<code class="crow-v" data-v="' + key + '">' + val + '</code>'
+            + '</div>';
+        });
+
+        html += '<div class="crow crow-id">'
+          + '<span class="crow-k"><b>导出为</b><em>主题 id / 名称，随便起</em></span>'
+          + '<input type="text" id="newThemeId" value="' + suggestId() + '">'
+          + '<input type="text" id="newThemeName" value="' + suggestName() + '">'
+          + '</div>';
+
+        colorBody.innerHTML = html;
+
+        Array.prototype.forEach.call(colorBody.querySelectorAll('input[type=color]'), function (inp) {
+          inp.addEventListener('input', function () {
+            var k = inp.getAttribute('data-k');
+            overrides[k] = inp.value;
+            var vEl = colorBody.querySelector('.crow-v[data-v="' + k + '"]');
+            if (vEl) vEl.textContent = inp.value;
+            render();
+          });
+        });
+
+        colorMask.classList.add('show');
+      }
+
+      function closeColor() { colorMask.classList.remove('show'); }
+
+      function suggestId() {
+        var base = themeSel.value || 'theme';
+        return base + '-custom';
+      }
+      function suggestName() {
+        var t = currentTheme();
+        return (t && t.name ? t.name : '主题') + '（自定义）';
+      }
+
+      function resetColor() {
+        overrides = {};
+        render();
+        openColor();
+        toast('已恢复为「' + (currentTheme().name || '') + '」原本的配色');
+      }
+
+      /* 导出的是一个「放进 themes/ 就能用」的 .js 文件，格式与
+       * check/build_theme_js.py 的产物一致 —— 拿到的人不需要装 Python 重新编译。
+       * 内容用全量快照而不是只存 diff：分享出去的主题必须自包含，
+       * 不能假设对方机器上还有原来那套。 */
+      function exportTheme() {
+        var t = currentTheme();
+        if (!t) { toast('先选一个主题'); return; }
+
+        var id = ($('newThemeId') && $('newThemeId').value.trim()) || suggestId();
+        var name = ($('newThemeName') && $('newThemeName').value.trim()) || suggestName();
+        id = id.replace(/[^a-zA-Z0-9_-]/g, '-');
+
+        var out = JSON.parse(JSON.stringify(t));
+        out.id = id;
+        out.name = name;
+        out.derivedFrom = (themeSel.value || '') + (Object.keys(overrides).length ? '（改过配色）' : '');
+        out.note = '由 App 配色面板导出。放进 themes/ 目录刷新即可，无需编译。';
+
+        // 自己这套立刻可用：注册进 GZH_THEMES 并写进 localStorage，刷新后还在下拉里。
+        // （不能只靠「丢进 themes/ 目录」—— 动态加载看的是 GZH_THEME_ORDER，
+        //   而它是编译产物，不含手工放进去的文件。）
+        window.GZH_THEMES[id] = out;
+        var extras = extraIds();
+        if (extras.indexOf(id) < 0) extras.push(id);
+        lsSet(LS_THEME + id, JSON.stringify(out));
+        lsSet(LS_EXTRA, JSON.stringify(extras));
+
+        buildThemeOptions();
+        themeSel.value = id;
+        overrides = {};      // 改动已固化进新主题，覆盖层清掉
+        render();
+
+        // 下载的这份是给别人的：对方用「导入主题」打开即可，不用装 Python 重编译
+        var js = '/* 自动生成，请勿手改。由 App 配色面板导出 */\n'
+          + '(function(g){\n'
+          + '  g.GZH_THEMES = g.GZH_THEMES || {};\n'
+          + "  g.GZH_THEMES['" + id + "'] = "
+          + JSON.stringify(out, null, 2) + ';\n'
+          + '})(window);\n';
+
+        var blob = new Blob([js], { type: 'application/javascript' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = id + '.js';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        toast('已存为「' + name + '」并在下拉里选中；' + id + '.js 也下载了，发给朋友用「导入主题」打开');
+      }
+
+      /* 导入：既能吃导出的 .js，也能吃源 .json。
+       * .js 是固定格式的 IIFE，直接跑一次就会把自己注册进 GZH_THEMES。 */
+      function importTheme(text, fname) {
+        var before = Object.keys(window.GZH_THEMES || {});
+        try {
+          if (/\.json$/i.test(fname) || /^\s*\{/.test(text)) {
+            var obj = JSON.parse(text);
+            if (!obj || !obj.id) throw new Error('缺少 id 字段');
+            window.GZH_THEMES[obj.id] = obj;
+          } else {
+            (new Function(text))();
+          }
+        } catch (e) {
+          toast('这个文件读不了：' + e.message);
+          return;
+        }
+
+        var added = Object.keys(window.GZH_THEMES).filter(function (k) {
+          return before.indexOf(k) < 0;
+        });
+        if (!added.length) { toast('文件里没有新主题'); return; }
+
+        var extras = extraIds();
+        added.forEach(function (id) {
+          if (extras.indexOf(id) < 0) extras.push(id);
+          lsSet(LS_THEME + id, JSON.stringify(window.GZH_THEMES[id]));
+        });
+        lsSet(LS_EXTRA, JSON.stringify(extras));
+
+        buildThemeOptions();
+        themeSel.value = added[added.length - 1];
+        overrides = {};
+        render();
+        toast('已导入「' + (window.GZH_THEMES[themeSel.value].name || themeSel.value) + '」');
+      }
+
+      $('colorBtn').addEventListener('click', openColor);
+      $('colorClose') && $('colorClose').addEventListener('click', closeColor);
+      colorMask.addEventListener('click', function (e) { if (e.target === colorMask) closeColor(); });
+      $('colorReset').addEventListener('click', resetColor);
+      $('colorExport').addEventListener('click', exportTheme);
+      $('colorImport').addEventListener('click', function () { $('themeFile').click(); });
+      $('themeFile').addEventListener('change', function (ev) {
+        var file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        var r = new FileReader();
+        r.onload = function () { importTheme(String(r.result), file.name); };
+        r.onerror = function () { toast('读文件失败'); };
+        r.readAsText(file);
+        ev.target.value = '';
+      });
+
       buildModules();
-      render();
+
+      loadThemeScripts(window.GZH_THEME_ORDER || [], function (missing) {
+        restoreImported();
+        buildThemeOptions();
+        render();
+        if (missing.length) toast('有几个主题没加载到：' + missing.join('、'));
+      });
     })();
   </script>
 </body>
