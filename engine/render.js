@@ -55,14 +55,21 @@
     subitem: 'subitemTree'
   };
 
-  function pickComp(theme, role) {
+  /* opt.annotate：给预览打元素定位标记（data-ep="0.1.2"）。
+   * 只有 UI 的组件预览会开，正式渲染与复制链路一律不带 —— 产物里不会出现这个属性。
+   * 非主树的模板（列表项等）前缀 i:，UI 靠它区分「点的是主体还是某一条」。 */
+  function pickComp(theme, role, opt) {
     var compo = theme.compositions && theme.compositions[role];
     var legacy = (theme.components && theme.components[role]) || GZH.FALLBACK[role];
     var out = {};
 
     Object.keys(KEY_MAP).forEach(function (k) {
-      if (compo && compo[KEY_MAP[k]]) out[k] = GZH.treeTpl(compo[KEY_MAP[k]]);
-      else if (legacy && legacy[k]) out[k] = legacy[k];
+      if (compo && compo[KEY_MAP[k]]) {
+        out[k] = GZH.treeTpl(compo[KEY_MAP[k]], {
+          annotate: !!(opt && opt.annotate),
+          prefix: k === 'tpl' ? '' : 'i:'
+        });
+      } else if (legacy && legacy[k]) out[k] = legacy[k];
     });
 
     out.source = (compo && compo.source) || (legacy && legacy.source);
@@ -114,10 +121,10 @@
     }).join('');
   }
 
-  function renderBlock(rawTheme, block) {
+  function renderBlock(rawTheme, block, opt) {
     // 主题先过一遍派生与引用展开，后面拿到的 token 都是可直接用的字面量
     var theme = prepared(rawTheme);
-    var comp = pickComp(theme, block.role);
+    var comp = pickComp(theme, block.role, opt);
     if (!comp.tpl && !comp.item) return '';
 
     var v = buildVars(theme, block);

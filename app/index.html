@@ -461,8 +461,9 @@
     }
     .cmp-new em { display: block; font-size: 11px; color: #9ca3af; margin: -4px 0 8px 92px; }
 
-    /* 元素树 + 属性面板：新增用户对Ras**
-     * 元素是属性字典，所以每个样式项都能配一个控件。 */
+    /* 元素树 + 属性面板
+     * 元素是属性字典，所以每个样式项都能配一个控件。
+     * 配套的另一半在预览区：data-ep 标记让「点哪一块改哪一块」成立。 */
     .etree {
       border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;
       max-height: 260px; overflow: auto; background: #fafafa;
@@ -506,6 +507,50 @@
     .eprow .unit { font-size: 11px; color: #9ca3af; flex: none; }
     .eprow.grp { padding-top: 6px; border-top: 1px solid #f3f4f6; }
     .epempty { color: #9ca3af; font-size: 12px; padding: 8px 0; }
+
+    /* 预览点选：鼠标经过 / 当前选中，都给描边，让「改的是这块」看得见 */
+    .cmp-prev [data-ep] { cursor: pointer; }
+    .cmp-prev .ep-hover { outline: 2px solid #93c5fd; outline-offset: 1px; }
+    .cmp-prev .ep-sel { outline: 2px solid #2563eb; outline-offset: 1px; }
+    .pick-info {
+      font-size: 11px; color: #9ca3af; margin-left: auto;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 62%;
+    }
+    .pick-info.on { color: #1d4ed8; }
+
+    /* 属性面板的定位信息：面包屑 / 这一处 / 作用域 */
+    .eprops .epcrumb { font-size: 11px; color: #9ca3af; line-height: 1.6; }
+    .eprops .epcrumb span { cursor: pointer; border-bottom: 1px dotted transparent; }
+    .eprops .epcrumb span:hover { color: #1d4ed8; border-bottom-color: #93c5fd; }
+    .eprops .epcrumb span:last-child { color: #374151; cursor: default; border: 0; }
+    .eprops .epwhat {
+      font-size: 12px; color: #111827; background: #f9fafb;
+      border: 1px solid #f3f4f6; border-radius: 6px; padding: 6px 8px;
+    }
+    .eprops .epscope {
+      font-size: 11px; color: #6b7280; background: #f3f4f6;
+      border-radius: 6px; padding: 5px 8px; line-height: 1.6;
+    }
+    .eprops code {
+      font-family: ui-monospace, Consolas, monospace; font-size: 11px;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 3px; padding: 0 3px;
+    }
+    .eprops .eptip {
+      font-size: 11px; color: #92400e; background: #fffbeb;
+      border: 1px solid #fde68a; border-radius: 6px; padding: 5px 8px; line-height: 1.6;
+    }
+    .eprops .epquick { display: flex; flex-wrap: wrap; gap: 4px; }
+    .eprops .epquick button {
+      font-size: 11px; padding: 3px 8px; border: 1px solid #e5e7eb; border-radius: 99px;
+      background: #fff; color: #4b5563; cursor: pointer;
+    }
+    .eprops .epquick button:hover { border-color: #93c5fd; color: #1d4ed8; }
+    .eprops .epquick button.has { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .eprops .epgrp {
+      font-size: 11px; color: #6b7280; padding-top: 6px;
+      border-top: 1px solid #f3f4f6; display: flex; gap: 6px; align-items: center;
+    }
+    .eprops .epgrp em { font-style: normal; font-size: 11px; color: #9ca3af; }
   </style>
 </head>
 
@@ -1566,9 +1611,9 @@ footer: 文末引导语
         var roles = compRoles();
         if (!cmpSel || roles.indexOf(cmpSel) < 0) cmpSel = roles[0] || null;
 
-        var html = '<p style="margin:0 0 10px;color:#6b7280;">选一个组件，左边点它的元素、'
-          + '右边逐项改属性 —— 字号、颜色、圆角、阴影都是一个个字段，不用碰 HTML。'
-          + '下面即时预览，实时体检，改坏了点「恢复默认」。</p>'
+        var html = '<p style="margin:0 0 10px;color:#6b7280;">选一个组件 → <b>在下面的预览里点你想改的那一块</b>'
+          + '（鼠标扫过会描边，左上角还会告诉你点的是什么）→ 右边改字号、颜色、圆角这些字段。'
+          + '全程不用碰 HTML，也不用知道属性叫什么。改坏了点「恢复默认」。</p>'
           + '<div class="cmp-row" style="margin-bottom:10px;">'
           + '<button class="mini" id="cmpNewBtn">+ 新建组件</button>'
           + '<span style="font-size:11px;color:#9ca3af;">组件＝稿子里 :::xxx 那个盒子长什么样</span>'
@@ -1674,7 +1719,7 @@ footer: 文末引导语
 
       /* 一个样式项配一个控件。控件类型由 CSS 属性名查表决定 ——
        * 查不到就给纯文本框，所以「没登记过的 CSS 属性」照样能改，只是没有专用控件。 */
-      function styleRowHTML(key, val) {
+      function styleRowHTML(key, val, node) {
         var E = window.GZH;
         var meta = E.propMeta(key);
         var h = '<div class="eprow"><span class="epk" title="' + escHtml(key) + '">'
@@ -1706,23 +1751,74 @@ footer: 文末引导语
             + escHtml(s) + '" spellcheck="false">';
         }
         h += '<button class="mini ep-delst" data-k="' + escHtml(key) + '" title="删除这一项">×</button>';
-        return h + '</div>';
+        h += '</div>';
+        // 「改了没反应」最常见的原因：里面那层自己也写了同一条，把外层的盖住了。
+        // 与其让用户怀疑人生，不如当场说清。
+        if (node && E.hasDeeper(node, key)) {
+          h += '<div class="eptip">它里面还有一层也设了「' + escHtml(meta.label)
+            + '」，改这里可能被盖住 —— 要改里面那层，直接在下面的预览里点它。</div>';
+        }
+        return h;
       }
 
       var STYLE_PRESET = ['font-size', 'color', 'background', 'padding', 'margin', 'margin-top',
         'border', 'border-radius', 'line-height', 'letter-spacing', 'text-align', 'font-weight',
         'box-shadow', 'width', 'height', 'gap', 'display'];
 
+      function styleKeysOf(st) {
+        st = st || {};
+        return (st.__order || Object.keys(st)).filter(function (k) {
+          return String(k).indexOf('__') !== 0 && Object.prototype.hasOwnProperty.call(st, k);
+        });
+      }
+
+      // 面包屑里的一级：类型 + 一句话定位（短）
+      function crumbLabel(n) {
+        var E = window.GZH;
+        var ty = E.ELEMENT_TYPES[n.type] || { label: n.type };
+        var s = (n.type === 'text' || n.type === 'badge') ? E.readable(n.text) : E.nodeSummary(n);
+        s = String(s || '').slice(0, 12);
+        return ty.label + (s && s !== ty.label ? '·' + s : '');
+      }
+
+      // 从组件根走到当前节点，告诉用户「你现在在哪一层」。
+      // 每一级都可点 —— 因为点在预览里时命中的往往是里面那块文字，
+      // 想改整个卡片就得能退回外层，面包屑是最顺手的退路。
+      function crumbHTML(role, path) {
+        var E = window.GZH;
+        var parts = ['<span data-crumb="0">' + escHtml(roleName(role)) + '</span>'];
+        var list = treeOf(role, cmpTreeKey) || [];
+        for (var i = 0; i < path.length; i++) {
+          var n = list[path[i]];
+          if (!n) break;
+          parts.push('<span data-crumb="' + (i + 1) + '">' + escHtml(crumbLabel(n)) + '</span>');
+          list = n.children || [];
+        }
+        return '<div class="epcrumb">' + parts.join(' › ') + '</div>';
+      }
+
       function propsHTML(node) {
         var E = window.GZH;
-        if (!node) return '<div class="epempty">在左边的树里点一个元素。</div>';
+        if (!node) {
+          return '<div class="epempty">在左边的树里点一个元素，'
+            + '或者更省事：<b>直接在下面的预览里点你想改的那一块</b>。</div>';
+        }
         var ty = E.ELEMENT_TYPES[node.type] || { label: node.type, desc: '' };
-        var h = '<div class="eph">' + escHtml(ty.label) + '<em>' + escHtml(ty.desc || '') + '</em></div>';
+
+        var h = crumbHTML(cmpSel, cmpPath)
+          + '<div class="epwhat">这一处：<b>' + escHtml(E.nodeIdentity(node)) + '</b></div>'
+          // 预览里点一下，命中的常常是里面那块文字。想改整个卡片，得有路退回外层。
+          + (cmpPath.length > 1
+            ? '<div class="epquick"><button data-eact="parent">↑ 改外面一层</button></div>' : '')
+          + '<div class="epscope">改的是「' + escHtml(roleName(cmpSel)) + '」'
+          + (cmpTreeKey === 'itemTree' ? '的列表项' : '这个组件')
+          + ' —— 稿子里所有 <code>:::' + escHtml(cmpSel) + '</code> 都跟着变。</div>';
 
         if (node.type === 'html') {
           return h + '<div class="epempty">这一块结构太不规则，没能拆成元素，'
-            + '保持在「源码」模式里改它。</div>'
-            + '<div class="eprow"><button class="mini" data-eact="delnode">删除这个块</button></div>';
+            + '要改它得切到「源码」模式。</div>'
+            + '<div class="eprow"><button class="mini" data-eact="tosrc">去源码模式</button>'
+            + '<button class="mini" data-eact="delnode">删除这个块</button></div>';
         }
 
         h += '<div class="eprow"><span class="epk">类型</span><select class="ep-type">'
@@ -1748,13 +1844,33 @@ footer: 文末引导语
           + escHtml(Array.isArray(node.if) ? node.if.join(',') : (node.if || ''))
           + '" placeholder="留空=总是显示，如 cover" spellcheck="false"></div>';
 
+        // 常用改动：先给一排「你想改什么」的按钮，点一下就加上对应的样式项。
+        // 省掉「先在下拉里找到 font-size 再点加」这一步 —— 那一步要懂 CSS 才走得通。
+        var st0 = node.style || {};
+        h += '<div class="epgrp"><span>常用改动</span><em>点一下就加上（蓝色的已经有了）</em></div>'
+          + '<div class="epquick">'
+          + E.CSS_QUICK.map(function (q) {
+            var has = st0[q[0]] !== undefined;
+            return '<button data-eact="quick" data-k="' + q[0] + '" data-def="' + escHtml(q[2]) + '"'
+              + (has ? ' class="has"' : '') + '>' + escHtml(q[1]) + '</button>';
+          }).join('') + '</div>';
+
         var st = node.style || {};
-        var keys = (st.__order || Object.keys(st)).filter(function (k) {
-          return k.indexOf('__') !== 0 && Object.prototype.hasOwnProperty.call(st, k);
+        var keys = styleKeysOf(st);
+        var used = {};
+        // 按用途分堆显示：找「颜色」比找 color 直观，这是不学 CSS 也能改的关键。
+        E.CSS_GROUPS.forEach(function (g) {
+          var ks = keys.filter(function (k) { return g[1].indexOf(k) >= 0; });
+          if (!ks.length) return;
+          ks.forEach(function (k) { used[k] = 1; });
+          h += '<div class="epgrp"><span>' + escHtml(g[0]) + '</span><em>' + ks.length + ' 项</em></div>';
+          ks.forEach(function (k) { h += styleRowHTML(k, st[k], node); });
         });
-        h += '<div class="eprow grp"><span class="epk">样式</span><em style="font-size:11px;color:#9ca3af;">'
-          + keys.length + ' 项</em></div>';
-        keys.forEach(function (k) { h += styleRowHTML(k, st[k]); });
+        var rest = keys.filter(function (k) { return !used[k]; });
+        if (rest.length) {
+          h += '<div class="epgrp"><span>其他</span><em>' + rest.length + ' 项</em></div>';
+          rest.forEach(function (k) { h += styleRowHTML(k, st[k], node); });
+        }
 
         h += '<div class="eprow grp"><span class="epk">加一项样式</span><select class="ep-newkey">'
           + STYLE_PRESET.map(function (k) {
@@ -1803,7 +1919,7 @@ footer: 文末引导语
           + '<button class="mini" data-act="mode" data-m="src"'
           + (cmpMode === 'src' ? ' style="border-color:#2563eb;color:#1d4ed8;"' : '') + '>源码</button>'
           + '<span style="font-size:11px;color:#9ca3af;">'
-          + (cmpMode === 'tree' ? '点元素改属性，不用碰 HTML'
+          + (cmpMode === 'tree' ? '预览里点哪块就改哪块，不用碰 HTML'
             : '直接改 HTML —— 元素模式做不到的效果在这里改') + '</span></div>';
 
         if (cmpMode === 'tree') {
@@ -1820,7 +1936,9 @@ footer: 文末引导语
         }
 
         return h + '<div class="cmp-msg" id="cmpMsg"></div>'
-          + '<div class="cmp-row"><label>预览 · 按这个组件的样例内容渲染</label></div>'
+          + '<div class="cmp-row"><label>预览 · '
+          + (cmpMode === 'tree' ? '鼠标点哪一块，左边就选中哪一块' : '按这个组件的样例内容渲染')
+          + '</label><span class="pick-info" id="pickInfo"></span></div>'
           + '<div class="cmp-prev" id="cmpPrev"></div>';
       }
 
@@ -1870,6 +1988,23 @@ footer: 文末引导语
           el.addEventListener('click', function () {
             cmpPath = (el.getAttribute('data-path') || '0').split('.').map(Number);
             tabComp();
+          });
+          // 反向映射：鼠标扫过树里的某一项，预览里那块就描边。
+          // 正向（点预览选树）和反向（扫树亮预览）都有的话，就不会再对不上。
+          el.addEventListener('mouseenter', function () {
+            var p = (el.getAttribute('data-path') || '0').split('.').map(Number);
+            var pv = $('cmpPrev');
+            if (!pv) return;
+            Array.prototype.forEach.call(pv.querySelectorAll(epSelector(p)), function (x) {
+              x.classList.add('ep-hover');
+            });
+          });
+          el.addEventListener('mouseleave', function () {
+            var pv = $('cmpPrev');
+            if (!pv) return;
+            Array.prototype.forEach.call(pv.querySelectorAll('.ep-hover'), function (x) {
+              x.classList.remove('ep-hover');
+            });
           });
         });
         var tk = $('tkSel');
@@ -1929,9 +2064,24 @@ footer: 文末引导语
           // bindComp 给所有 [data-act] 都绑了处理器并调用了 stopPropagation()，
           // 面板里的按钮若也用 data-act，事件冒泡不到这里 —— 症状是「按钮点了没反应」。
           props.addEventListener('click', function (e) {
+            // 面包屑上溯：点第几级就回到第几层
+            var cb = e.target.closest ? e.target.closest('[data-crumb]') : null;
+            if (cb) {
+              var lv = parseInt(cb.getAttribute('data-crumb'), 10) || 0;
+              cmpPath = cmpPath.slice(0, lv);
+              if (!cmpPath.length) cmpPath = [0];
+              tabComp(); return;
+            }
+
             var b = e.target.closest('button[data-eact], button.ep-delst');
             if (!b) return;
             var act = b.getAttribute('data-eact');
+
+            if (act === 'parent') {
+              cmpPath = cmpPath.slice(0, -1);
+              if (!cmpPath.length) cmpPath = [0];
+              tabComp(); return;
+            }
 
             if (b.classList.contains('ep-delst')) {
               var k2 = b.getAttribute('data-k');
@@ -1942,6 +2092,31 @@ footer: 文末引导语
                 var j = o.indexOf(k2); if (j >= 0) o.splice(j, 1);
               });
               tabComp(); return;
+            }
+            if (act === 'quick') {
+              var qk = b.getAttribute('data-k'), qd = b.getAttribute('data-def') || '';
+              var cur = nodeAt(cmpSel, cmpTreeKey, cmpPath);
+              if (cur && cur.style && cur.style[qk] !== undefined) {
+                toast('「' + b.textContent + '」已经有了 —— 在下面的「'
+                  + window.GZH.propMeta(qk).label + '」那一行改数值');
+                return;
+              }
+              writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+                n.style = n.style || {};
+                n.style[qk] = qd;
+                if (!n.style.__order) {
+                  n.style.__order = Object.keys(n.style).filter(function (x) { return x.indexOf('__') !== 0; });
+                }
+                n.style.__order.push(qk);
+              });
+              tabComp();
+              toast('已加上「' + b.textContent + '」—— 改数值就能看到变化');
+              return;
+            }
+            if (act === 'tosrc') {
+              cmpMode = 'src'; tabComp();
+              toast('已切到源码模式 —— 这块没拆成元素，只能改 HTML');
+              return;
             }
             if (act === 'addstyle') {
               var nk = props.querySelector('.ep-newkey');
@@ -2118,6 +2293,72 @@ footer: 文末引导语
         if (tplMsg) box.innerHTML = tplMsg + box.innerHTML;
       }
 
+      /* 预览点选 —— 把「在树里盲选」换成「看着改」
+       *
+       * 元素树模式下渲染时给每个元素打上 data-ep（它在树里的路径），
+       * 于是鼠标点到哪一块，就能反查出该改树里的哪个节点。
+       * 之前只有一棵文字树，用户看不出「第 3 个盒子」是预览里的哪块 ——
+       * 那是「改了对应不上」的直接原因。
+       *
+       * data-ep 只存在于预览；复制到公众号走的是不带标记的正式渲染。 */
+      var _hoverEl = null;
+
+      function epSelector(path) {
+        return '[data-ep="' + (cmpTreeKey === 'itemTree' ? 'i:' : '') + path.join('.') + '"]';
+      }
+      function paintSel() {
+        var el = $('cmpPrev');
+        if (!el) return;
+        Array.prototype.forEach.call(el.querySelectorAll('.ep-hover,.ep-sel'), function (x) {
+          x.classList.remove('ep-hover', 'ep-sel');
+        });
+        Array.prototype.forEach.call(el.querySelectorAll(epSelector(cmpPath)), function (x) {
+          x.classList.add('ep-sel');
+        });
+      }
+      function pickInfo(text, on) {
+        var box = $('pickInfo');
+        if (!box) return;
+        box.textContent = text || '';
+        if (on) box.classList.add('on'); else box.classList.remove('on');
+      }
+      function describeEP(v) {
+        var isItem = String(v || '').indexOf('i:') === 0;
+        var path = String(v || '').replace(/^i:/, '').split('.').map(Number);
+        var n = nodeAt(cmpSel, isItem ? 'itemTree' : 'tree', path);
+        return n ? window.GZH.nodeIdentity(n) : '';
+      }
+      function bindPreviewPicker(el) {
+        el.addEventListener('mouseover', function (e) {
+          var tg = e.target.closest ? e.target.closest('[data-ep]') : null;
+          if (!tg || tg === _hoverEl) return;
+          if (_hoverEl) _hoverEl.classList.remove('ep-hover');
+          _hoverEl = tg;
+          tg.classList.add('ep-hover');
+          pickInfo('这块是：' + describeEP(tg.getAttribute('data-ep')) + ' —— 点一下就选中它', true);
+        });
+        el.addEventListener('mouseleave', function () {
+          if (_hoverEl) { _hoverEl.classList.remove('ep-hover'); _hoverEl = null; }
+          pickInfo('', false);
+        });
+        el.addEventListener('click', function (e) {
+          var tg = e.target.closest ? e.target.closest('[data-ep]') : null;
+          if (!tg) return;
+          var v = tg.getAttribute('data-ep') || '';
+          var isItem = v.indexOf('i:') === 0;
+          var path = v.replace(/^i:/, '').split('.').map(Number);
+          if (isItem) {
+            if (!(treeOf(cmpSel, 'itemTree') || []).length) return;
+            cmpTreeKey = 'itemTree';
+          } else {
+            cmpTreeKey = 'tree';
+          }
+          cmpPath = path;
+          tabComp();
+          toast('已选中：' + (describeEP(v) || '这一块'));
+        });
+      }
+
       /* 用一个样例 block 渲染这一个组件 —— 比看 HTML 直观得多。
        * 样例内容直接取注册表里的 snippet，所以「这个盒子在稿子里怎么用」也是现成的示范。 */
       function previewComp(role) {
@@ -2134,6 +2375,15 @@ footer: 文末引导语
           t.components[role] = t.components[role] || {};
           t.components[role].tpl = ($('cmpTpl') && $('cmpTpl').value) || '';
           if ($('cmpItem')) t.components[role].item = $('cmpItem').value;
+        } else {
+          // 元素模式下，预览必须渲染「你正在编辑的这棵树」：
+          // 老主题没有 compositions，若放任它退回 tpl，渲染结果虽然一样，
+          // 但没有 data-ep 标记 —— 点选就废了。统一走树，两个问题一起解决。
+          t.compositions = t.compositions || {};
+          var c = t.compositions[role] = Object.assign({}, t.compositions[role]);
+          c.tree = treeOf(role, 'tree');
+          var it = treeOf(role, 'itemTree');
+          if (it && it.length) c.itemTree = it;
         }
 
         var m = window.GZH.MODULES && window.GZH.MODULES[role];
@@ -2149,8 +2399,12 @@ footer: 文末引导语
               + '改完看右侧全文预览就行。</div>';
             return;
           }
-          el.innerHTML = window.GZH.renderBlock(t, blk);
-          checkCompHealth(el.innerHTML, t);
+          el.innerHTML = window.GZH.renderBlock(t, blk, { annotate: cmpMode === 'tree' });
+          bindPreviewPicker(el);
+          paintSel();
+          // 体检看的是「要发到微信的那份」，所以先把定位标记摘掉再查，
+          // 免得体检规则哪天去数属性时把 data-ep 算进去。
+          checkCompHealth(el.innerHTML.replace(/ data-ep="[^"]*"/g, ''), t);
         } catch (e) {
           el.innerHTML = '<div class="cmp-prev-empty" style="color:#991b1b;">预览失败：'
             + escHtml(e.message) + '</div>';

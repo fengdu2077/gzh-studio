@@ -107,6 +107,42 @@
     return PROPS[k] || { label: k, ctrl: 'text' };
   }
 
+  /* ---------- 属性分组：给 UI 用的「人话分区」 ----------
+   *
+   * 为什么需要分组：一个节点身上可能有 8~12 条样式，摊平给用户看就是一串
+   * CSS 名。按「你想改什么」分堆之后，用户找的是「颜色」这一类，不是
+   * `color` 这个属性名 —— 这是「不会 HTML 也能改」的第一道门槛。
+   *
+   * 没被任何组收走的属性统一落到「其他」，所以这张表不需要穷举 CSS。
+   */
+  var GROUPS = [
+    ['文字', ['font-size', 'font-weight', 'line-height', 'letter-spacing', 'color',
+      'text-align', 'font-family', 'font-style', 'text-decoration',
+      'text-indent', 'word-spacing', 'white-space', 'word-break']],
+    ['颜色与背景', ['background', 'background-color', 'opacity', 'box-shadow']],
+    ['间距', ['margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+      'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'gap']],
+    ['边框与圆角', ['border', 'border-top', 'border-bottom', 'border-left', 'border-right',
+      'border-radius', 'border-top-left-radius']],
+    ['尺寸与排列', ['width', 'max-width', 'min-width', 'height', 'min-height', 'max-height',
+      'display', 'flex', 'align-items', 'justify-content', 'vertical-align',
+      'overflow', 'transform']]
+  ];
+
+  /* 常用改动：面板顶部的一排快捷入口。
+   * 用户不用先在下拉里找到「font-size」再点「加」，直接点「字号」就有了。
+   * def 是新建时的默认值 —— 给一个能立刻看出变化的数，别给空值。 */
+  var QUICK = [
+    ['font-size', '字号', '16px'],
+    ['color', '文字色', '#333333'],
+    ['background', '背景', '#f5f5f5'],
+    ['border-radius', '圆角', '8px'],
+    ['padding', '内边距', '12px'],
+    ['margin', '外边距', '0 0 12px'],
+    ['line-height', '行高', '1.7'],
+    ['box-shadow', '阴影', '0 2px 8px rgba(0,0,0,.06)']
+  ];
+
   var ENUMS = {
     'text-align': ['left', 'center', 'right', 'justify'],
     'font-weight': ['300', '400', '500', '600', '700', 'bold', 'normal'],
@@ -159,45 +195,76 @@
     return body;
   }
 
-  function nodeTpl(n) {
+  /* annotate：给预览用的「定位标记」
+   * ------------------------------------------------------------------
+   * 渲染时可选地在每个元素上打一个 data-ep="0.1.2"（元素在树里的路径）。
+   * 有了它，预览里点哪一块就能反查出「改的是树里哪个节点」——
+   * 这是「所见即所选」的地基。
+   *
+   * 这个标记**只给本地预览用**：正式渲染（复制到公众号那条链路）从来不开，
+   * 所以产物里不会出现 data-ep，不影响微信红线。
+   * 默认关闭，只有 UI 显式传 opt.annotate 才生效。
+   */
+  function markOf(path, opt) {
+    if (!opt || !opt.annotate || !path) return '';
+    return ' data-ep="' + (opt.prefix || '') + path.join('.') + '"';
+  }
+
+  // html 类型是一整段原始 HTML，没有「自己的根标签」可以挂属性，
+  // 所以把标记塞进第一个开标签里。塞不进去（比如以文本开头）就跳过 ——
+  // 那块仍然能在树里选中，只是预览里点不到。
+  function markHtml(html, mark) {
+    if (!mark) return html;
+    return html.replace(/<([a-zA-Z][a-zA-Z0-9]*)([\s>])/, function (m, tag, tail) {
+      return '<' + tag + mark + (tail === '>' ? ' ' : '') + (tail === '>' ? '' : tail);
+    });
+  }
+
+  function nodeTpl(n, opt, path) {
     if (!n) return '';
     var type = n.type || 'box';
+    var mark = markOf(path, opt);
     var body = '';
 
     if (type === 'html') {
-      body = n.html || '';
+      body = markHtml(n.html || '', mark);
     } else if (type === 'slot') {
+      // 槽位渲染成变量文本，没有标签可挂 —— 靠父元素命中，不影响使用
       body = '{{' + (n.name || 'content') + '}}';
     } else if (type === 'text' || type === 'badge') {
       var inner = '<span leaf=""';
       if (type === 'badge' && n.span) inner += ' style="' + styleStr(n.span) + '"';
       inner += '>' + (n.text == null ? '{{text}}' : n.text) + '</span>';
-      body = '<p style="' + styleStr(n.style) + '">' + inner + '</p>';
+      body = '<p style="' + styleStr(n.style) + '"' + mark + '>' + inner + '</p>';
     } else if (type === 'image') {
       var img = '<img src="' + (n.src == null ? '{{src}}' : n.src) + '"';
       if (n.imgStyle) img += ' style="' + styleStr(n.imgStyle) + '"';
       img += '>';
-      body = '<p style="' + styleStr(n.style) + '">' + img + '</p>';
+      body = '<p style="' + styleStr(n.style) + '"' + mark + '>' + img + '</p>';
     } else if (type === 'chip' || type === 'figure') {
       // 内联小容器（<span>）/ 图文块（<figure>）：都是「有样式的一段内容」
       var tag = type === 'chip' ? 'span' : 'figure';
-      body = '<' + tag + ' style="' + styleStr(n.style) + '">' + childrenTpl(n.children) + '</' + tag + '>';
+      body = '<' + tag + ' style="' + styleStr(n.style) + '"' + mark + '>'
+        + childrenTpl(n.children, opt, path) + '</' + tag + '>';
     } else {
       // box / grid / divider / spacer：都是 <section>
-      body = '<section style="' + styleStr(n.style) + '">'
-        + childrenTpl(n.children)
+      body = '<section style="' + styleStr(n.style) + '"' + mark + '>'
+        + childrenTpl(n.children, opt, path)
         + '</section>';
     }
 
     return wrapIf(n, body);
   }
 
-  function childrenTpl(list) {
-    return (list || []).map(nodeTpl).join('');
+  function childrenTpl(list, opt, base) {
+    base = base || [];
+    return (list || []).map(function (n, i) {
+      return nodeTpl(n, opt, base.concat([i]));
+    }).join('');
   }
 
-  function treeTpl(nodes) {
-    return childrenTpl(nodes);
+  function treeTpl(nodes, opt) {
+    return childrenTpl(nodes, opt, []);
   }
 
   /* ---------- 给 UI 用的辅助：从元素里取一句话摘要 ---------- */
@@ -210,13 +277,77 @@
     return (TYPES[n.type] || { label: n.type }).label;
   }
 
+  // 元素身上写给人看的文字（把 {{title}} 这类变量还原成「标题」这样的白话）
+  function readable(s) {
+    var t = String(s == null ? '' : s).replace(/\{\{|\}\}/g, '').trim();
+    var known = {
+      title: '标题', subtitle: '副标题', lede: '导语', text: '正文', content: '正文内容',
+      kicker: '眉题', tagline: '标语', issue: '期号', account: '账号名', caption: '图注',
+      label: '标签', bio: '简介', footer: '页脚', author: '作者', initial: '头像首字',
+      roleline: '身份行', action: '按钮字', badge: '角标', src: '图片地址', no: '序号'
+    };
+    if (known[t]) return known[t];
+    return t;
+  }
+
+  /* 「这一处是干什么的」—— 面板顶部那句话。
+   * 用户判断「我有没有点对地方」全靠它：光说「盒子」等于没说，
+   * 说「区块 · 里面 3 块 · 高 120px」才对得上眼睛看到的东西。 */
+  function nodeIdentity(n) {
+    if (!n) return '';
+    var ty = TYPES[n.type] || { label: n.type || '元素' };
+    var bits = [ty.label];
+    if (n.type === 'text' || n.type === 'badge') {
+      var t = readable(n.text);
+      bits.push(t ? '「' + t.slice(0, 14) + '」' : '（空）');
+    } else if (n.type === 'slot') {
+      bits.push('内容填在 ' + readable(n.name || 'content'));
+    } else if (n.type === 'image') {
+      bits.push(readable(n.src).slice(0, 16) || '图片');
+    } else if (n.type === 'html') {
+      return '原始 HTML 块（没拆成元素）';
+    } else if (n.type === 'divider') {
+      var h = n.style && n.style['border-top'] ? '（' + n.style['border-top'] + '）' : '';
+      bits.push(h);
+    } else if (n.children && n.children.length) {
+      bits.push('里面 ' + n.children.length + ' 块');
+    }
+    var st = n.style || {};
+    var hint = [];
+    if (st['font-size']) hint.push('字号 ' + st['font-size']);
+    if (st['color']) hint.push('文字色 ' + st['color']);
+    if (st['background'] || st['background-color']) hint.push('有底色');
+    if (st['height']) hint.push('高 ' + st['height']);
+    if (hint.length) bits.push('· ' + hint.slice(0, 2).join(' · '));
+    return bits.join(' ');
+  }
+
+  /* 子树里是否也设了同一个样式属性。
+   * 用来解释「我明明改了颜色，怎么没反应」—— 内层自己写了 color，
+   * 外层的就被盖住了。提前说一句，比让用户怀疑人生强。 */
+  function hasDeeper(n, key) {
+    var kids = n && n.children;
+    if (!kids) return false;
+    for (var i = 0; i < kids.length; i++) {
+      var c = kids[i];
+      if (c.style && c.style[key] !== undefined && c.style[key] !== '') return true;
+      if (hasDeeper(c, key)) return true;
+    }
+    return false;
+  }
+
   GZH.ELEMENT_TYPES = TYPES;
   GZH.CSS_PROPS = PROPS;
   GZH.CSS_ENUMS = ENUMS;
+  GZH.CSS_GROUPS = GROUPS;
+  GZH.CSS_QUICK = QUICK;
   GZH.propMeta = propMeta;
   GZH.styleStr = styleStr;
   GZH.treeTpl = treeTpl;
   GZH.nodeTpl = nodeTpl;
   GZH.nodeSummary = nodeSummary;
+  GZH.nodeIdentity = nodeIdentity;
+  GZH.readable = readable;
+  GZH.hasDeeper = hasDeeper;
 
 })(window);

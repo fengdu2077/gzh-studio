@@ -184,8 +184,90 @@ check('删掉 compositions 后渲染结果不变（退回 tpl 路径）',
   G.renderBlock(legacy, { role: 'para', text: 'x' }) === G.renderBlock(clone(theme), { role: 'para', text: 'x' }));
 check('老主题仍能被现场翻译出来编辑', G.tplToTree(legacy.components.para.tpl).length > 0);
 
-/* ---------- ⑤ 整个 demo 文档仍然不回归 ---------- */
-console.log('\n⑤ 全文渲染');
+/* ---------- ⑤ 点选标记：预览能定位，正式产物不受污染 ---------- */
+console.log('\n⑤ 预览点选标记 data-ep');
+
+var plain = renderRole(clone(theme.compositions.note.tree), 'note', { role: 'note', text: 'x' });
+var marked = (function () {
+  var t = clone(theme);
+  t.compositions = clone(t.compositions || {});
+  t.compositions.note = Object.assign({}, t.compositions.note,
+    { tree: clone(theme.compositions.note.tree) });
+  return G.renderBlock(t, { role: 'note', text: 'x' }, { annotate: true });
+})();
+
+check('正式渲染不含 data-ep（复制到微信的产物不被污染）', plain.indexOf('data-ep') < 0);
+check('预览渲染带上了 data-ep', marked.indexOf('data-ep="0"') >= 0);
+check('摘掉标记后与正式渲染逐字节相同',
+  marked.replace(/ data-ep="[^"]*"/g, '') === plain);
+
+function countNodes(list) {
+  var n = 0;
+  (list || []).forEach(function (x) { n += 1 + countNodes(x.children); });
+  return n;
+}
+// 漏标一块，那块就点不到 —— 「点哪改哪」会在它身上静默失效。
+// 用一棵没有条件段的树来数，否则条件不满足的节点本就不渲染，数对不上。
+var demoTree = [
+  { type: 'box', style: { margin: '0', __order: ['margin'], __semi: true }, children: [
+    { type: 'text', text: 'A', style: { __order: [], __semi: false } },
+    { type: 'text', text: 'B', style: { __order: [], __semi: false } }
+  ] }
+];
+var demoMarked = G.treeTpl(demoTree, { annotate: true });
+var want = countNodes(demoTree);
+var got = (demoMarked.match(/data-ep="/g) || []).length;
+check('每个元素都打到了标记（' + got + '/' + want + '）', got === want,
+  '漏标的元素在预览里点不中');
+
+// 条件成立的节点也要能点到（note 给足 label/title 后应该比只给 text 时更多）
+var fullNote = renderRole(clone(theme.compositions.note.tree), 'note',
+  { role: 'note', label: 'L', title: 'T', text: 'x' });
+var fullMarked = (function () {
+  var t = clone(theme);
+  t.compositions = clone(t.compositions || {});
+  t.compositions.note = Object.assign({}, t.compositions.note,
+    { tree: clone(theme.compositions.note.tree) });
+  return G.renderBlock(t, { role: 'note', label: 'L', title: 'T', text: 'x' }, { annotate: true });
+})();
+check('条件成立的块也能点到（' + (fullMarked.match(/data-ep="/g) || []).length
+  + ' > ' + (marked.match(/data-ep="/g) || []).length + '）',
+  (fullMarked.match(/data-ep="/g) || []).length > (marked.match(/data-ep="/g) || []).length);
+check('带条件的预览摘掉标记后仍与正式渲染一致',
+  fullMarked.replace(/ data-ep="[^"]*"/g, '') === fullNote);
+
+// 列表项的标记必须带 i: 前缀：UI 靠它区分「点的是主体还是某一条」
+var itemRole = Object.keys(theme.compositions).filter(function (r) {
+  return (theme.compositions[r].itemTree || []).length;
+})[0];
+if (itemRole) {
+  var im = (function () {
+    var t = clone(theme);
+    t.compositions = clone(t.compositions || {});
+    t.compositions[itemRole] = clone(theme.compositions[itemRole]);
+    return G.renderBlock(t, { role: itemRole, items: ['一', '二'] }, { annotate: true });
+  })();
+  check('列表项的标记带 i: 前缀（' + itemRole + '）', im.indexOf('data-ep="i:') >= 0);
+} else {
+  check('列表项的标记带 i: 前缀', false, '没找到带 itemTree 的组件');
+}
+
+/* ---------- ⑥ 面板靠它们把「这一处」说清楚 ---------- */
+console.log('\n⑥ 身份描述与覆盖提示');
+check('身份描述把变量说成人话（{{title}} → 标题）',
+  G.nodeIdentity({ type: 'text', text: '{{title}}' }).indexOf('标题') >= 0);
+check('身份描述带出字号，方便核对有没有点对',
+  G.nodeIdentity({ type: 'text', text: 'x', style: { 'font-size': '20px', __order: ['font-size'], __semi: true } })
+    .indexOf('20px') >= 0);
+var shadowed = {
+  type: 'box', style: { color: '#111' },
+  children: [{ type: 'box', style: { color: '#222' }, children: [] }]
+};
+check('能发现内层也设了同一属性（「改了没反应」的元凶）',
+  G.hasDeeper(shadowed, 'color') === true && G.hasDeeper(shadowed, 'font-size') === false);
+
+/* ---------- ⑦ 整个 demo 文档仍然不回归 ---------- */
+console.log('\n⑦ 全文渲染');
 try {
   var md = fs.readFileSync('samples/demo.md', 'utf8');
   var html = G.render(G.toIR(G.parse(md)), JSON.parse(fs.readFileSync('themes/blue-editorial.json', 'utf8')));
