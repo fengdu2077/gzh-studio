@@ -882,6 +882,10 @@ footer: 文末引导语
           return;
         }
 
+        // 已上传过的图（base64 → 微信 URL）在这里套回去：
+        // 上传一次，之后每次重渲染都直接用微信的地址，不用再传一遍
+        html = applyImgMap(html);
+
         currentHTML = html;
         previewEl.innerHTML = html;
         window.__gzhLastIR = ir;
@@ -1205,6 +1209,62 @@ footer: 文末引导语
       })();
       function savePub() { lsSet(LS_PUB, JSON.stringify(pubCfg)); }
 
+      /* ---------- 正文图片映射 ----------
+       * 微信草稿正文只认自己域下的图片（mmbiz.qpic.cn）。占位图是 base64 data URI，
+       * 外链图也不保证显示 —— 正文里的图必须先传进公众号，拿到微信 URL 再替换掉。
+       *
+       * 上传结果按「图片内容」记一张映射表存 localStorage：
+       *   同一个占位图不用重复传，之后每次重渲染也自动套回微信 URL。 */
+      var LS_IMGMAP = 'gzh.imgmap';
+      var imgMap = (function () {
+        try { return JSON.parse(lsGet(LS_IMGMAP) || '{}') || {}; } catch (e) { return {}; }
+      })();
+      function saveImgMap() { lsSet(LS_IMGMAP, JSON.stringify(imgMap)); }
+
+      // data URI 动辄几万字节，整条当 key 会把 localStorage 撑爆 —— 取首尾片段 + 长度
+      function imgKey(src) {
+        if (!src) return '';
+        if (src.length <= 128) return src;
+        return src.slice(0, 64) + '#' + src.length + '#' + src.slice(-24);
+      }
+
+      function applyImgMap(html) {
+        if (!html) return html;
+        if (!Object.keys(imgMap).length) return html;
+        return html.replace(/<img([^>]*?)\ssrc="([^"]+)"/g, function (m, pre, src) {
+          var wx = imgMap[imgKey(src)];
+          return wx ? '<img' + pre + ' src="' + wx + '"' : m;
+        });
+      }
+
+      // 把正文里的 <img src> 全扫一遍，按「能不能直接发」分类
+      function scanImgs(html) {
+        var out = [], seen = {};
+        (html.match(/<img[^>]*\ssrc="[^"]+"/g) || []).forEach(function (tag) {
+          var m = tag.match(/\ssrc="([^"]+)"/);
+          if (!m) return;
+          var src = m[1];
+          if (seen[src]) return;
+          seen[src] = 1;
+          var kind = /^data:image\//i.test(src) ? 'base64'
+            : /^https?:\/\/(mmbiz|res\.wx)\./i.test(src) ? 'wx'
+              : /^https?:\/\//i.test(src) ? 'remote' : 'other';
+          out.push({ src: src, kind: kind });
+        });
+        return out;
+      }
+
+      function dataURItoBlob(uri) {
+        var m = String(uri).match(/^data:([^;,]+)(;base64)?,([\s\S]*)$/);
+        if (!m) return null;
+        var bin;
+        try { bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]); }
+        catch (e) { return null; }
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new Blob([arr], { type: m[1] || 'image/png' });
+      }
+
       var pubMask = $('pubMask'), pubBody = $('pubBody');
 
       // 微信常见 errcode → 人话。尤其 40164（IP 白名单）必须先讲清楚，
@@ -1304,12 +1364,27 @@ footer: 文末引导语
           + '<button id="pubPick" class="mini">从素材库选</button>'
           + '<button id="pubUpload" class="mini">上传一张</button></div>'
 
+          // ⑥ 正文图片（草稿只认微信自家的图片地址）
+          + '<div class="crow"><span class="crow-k"><b>正文图片</b>'
+          + '<em>微信草稿不认 base64 占位图。点「上传并替换」把正文里的图传进公众号，自动换成微信 URL；'
+          + '传过一次的图会记住，以后重渲染直接套用</em></span>'
+          + '<code class="crow-v" id="pubImgStat" style="min-width:150px;">—</code>'
+          + '<button id="pubImgUpload" class="mini">上传并替换</button>'
+          + '<button id="pubImgMap" class="mini">清除映射</button></div>'
+          + '<div class="crow"><span class="crow-k"><b>存入素材库</b>'
+          + '<em>默认走「正文图片」接口：不占素材库张数配额，但后台素材库里看不到；'
+          + '勾上则传成永久素材（占配额，可在素材库翻到、可复用）</em></span>'
+          + '<label class="crow-v" style="display:flex;align-items:center;gap:6px;font-size:12px;">'
+          + '<input type="checkbox" id="pubImgMaterial"' + (pubCfg.imgToMaterial ? ' checked' : '') + '> 传成永久素材</label></div>'
+
           + '<div id="pubStatus"></div>'
           + '<div class="pub-help">'
           + '<b>三个前提，缺一不可：</b>'
           + '① 公众号是<b>认证</b>的服务号/订阅号（未认证号没有草稿接口权限）；'
           + '② 本机公网 IP 已加进<b>IP 白名单</b>；'
           + '③ AppID / AppSecret 填对。'
+          + '<br><b>正文图片：</b>占位图是 base64 内嵌图，微信认不了，发之前先点「上传并替换」。'
+          + '默认走图文消息内图片接口（不占素材库配额），勾上「传成永久素材」才会进素材库。'
           + '<br>代理只在你需要发稿时开着，不发稿可以关掉（Ctrl+C）。'
           + '</div>';
 
@@ -1406,6 +1481,28 @@ footer: 文末引导语
               });
           });
         });
+
+        $('pubImgUpload').addEventListener('click', function () {
+          readCfg();
+          if (!pubCfg.appId || !pubCfg.appSecret) { pubStatus('先填 AppID / AppSecret', 'bad'); return; }
+          if ($('pubImgMaterial')) { pubCfg.imgToMaterial = $('pubImgMaterial').checked; savePub(); }
+          replaceArticleImgs();
+        });
+
+        $('pubImgMap').addEventListener('click', function () {
+          var n = Object.keys(imgMap).length;
+          if (!n) { pubStatus('映射表是空的 —— 还没上传过图片', 'bad'); return; }
+          if (!window.confirm('清除已记住的 ' + n + ' 张图片地址？\n之后重渲染会退回 base64 占位图，需要重新上传。')) return;
+          imgMap = {}; saveImgMap();
+          render(); refreshImgStat();
+          pubStatus('已清除 ' + n + ' 条图片映射', 'good');
+        });
+
+        if ($('pubImgMaterial')) $('pubImgMaterial').addEventListener('change', function () {
+          pubCfg.imgToMaterial = this.checked; savePub();
+        });
+
+        refreshImgStat();
       }
 
       // access_token 现取现用（7200 秒有效），不落盘 —— 落盘就要处理过期与多页面竞争
@@ -1420,6 +1517,109 @@ footer: 文末引导语
             if (!d || !d.access_token) { cb(new Error(wxErrText(d) || '没拿到 access_token')); return; }
             cb(null, d.access_token);
           });
+      }
+
+      /* 上传一张图到公众号，换回一个能直接写进正文的 URL。
+       *
+       * 两条接口，差别要说清：
+       *   media/uploadimg        —— 图文消息内的图片。**不占素材库配额**，
+       *                            但只收 jpg/png、≤1MB，**不会出现在素材库里**。正文用这个就够。
+       *   material/add_material  —— 永久素材。**占素材库张数配额**，能在后台素材库里翻到、可复用（封面就是它）。
+       * 默认走前者；图超 1MB 或不是 jpg/png 时自动回退到后者（上限 10MB）。 */
+      function uploadImg(src, toMaterial, cb) {
+        var blob = dataURItoBlob(src);
+        if (!blob) { cb(new Error('读不出这张图的二进制 —— 目前只支持正文里内嵌的 base64 图')); return; }
+
+        var t = blob.type || 'image/png';
+        var small = /(jpeg|jpg|png)/i.test(t) && blob.size <= 1024 * 1024;
+        var useMaterial = !!toMaterial || !small;
+
+        var ext = /png/i.test(t) ? 'png' : /gif/i.test(t) ? 'gif' : /webp/i.test(t) ? 'webp' : 'jpg';
+        var fd = new FormData();
+        fd.append('media', blob, 'gzh-' + Date.now() + '.' + ext);
+
+        getToken(function (err, token) {
+          if (err) { cb(err); return; }
+          var q = 'access_token=' + encodeURIComponent(token);
+          if (useMaterial) {
+            wxApi('cgi-bin/material/add_material', q + '&type=image', fd, function (e, d) {
+              if (e) { cb(e); return; }
+              var bad = wxErrText(d);
+              if (bad) { cb(new Error(bad)); return; }
+              if (!d || !d.url) { cb(new Error('微信没返回 url：' + JSON.stringify(d).slice(0, 120))); return; }
+              cb(null, d.url, d.media_id || '', true);
+            });
+          } else {
+            wxApi('cgi-bin/media/uploadimg', q, fd, function (e, d) {
+              if (e) { cb(e); return; }
+              var bad = wxErrText(d);
+              if (bad) { cb(new Error(bad)); return; }
+              if (!d || !d.url) { cb(new Error('微信没返回 url：' + JSON.stringify(d).slice(0, 120))); return; }
+              cb(null, d.url, '', false);
+            });
+          }
+        });
+      }
+
+      // 面板上那一行统计：正文里到底有几张图、几张还没传
+      function refreshImgStat() {
+        var el = $('pubImgStat');
+        if (!el) return;
+        var list = scanImgs(currentHTML || '');
+        // 换过地址的图 src 已经是微信 URL，得靠反查映射表才知道「这张是我们传的」
+        var vals = {};
+        Object.keys(imgMap).forEach(function (k) { vals[imgMap[k]] = 1; });
+        var need = 0, done = 0, wx = 0, other = 0;
+        list.forEach(function (it) {
+          if (vals[it.src]) done++;
+          else if (it.kind === 'wx') wx++;
+          else if (it.kind === 'base64') need++;
+          else other++;
+        });
+        el.textContent = list.length
+          ? list.length + ' 张 · 已上传 ' + done + ' · 待上传 ' + need
+          + (wx ? ' · 微信图 ' + wx : '') + (other ? ' · 外链 ' + other : '')
+          : '正文里没有图片';
+      }
+
+      /* 批量上传：串行跑（并发容易撞频率限制），逐张记映射，失败的单独报出来。
+       * 全部结束后把映射套回正文并重画预览 —— 体检区会立刻看到 base64 清零。 */
+      function replaceArticleImgs() {
+        if (!currentHTML) { pubStatus('正文还是空的', 'bad'); return; }
+        var list = scanImgs(currentHTML);
+        var todo = list.filter(function (it) { return it.kind === 'base64' && !imgMap[imgKey(it.src)]; });
+        var other = list.filter(function (it) { return it.kind === 'remote' || it.kind === 'other'; }).length;
+
+        if (!todo.length) {
+          pubStatus('没有需要上传的图 ✓（正文共 ' + list.length + ' 张）'
+            + (other ? '　注意：还有 ' + other + ' 张外链/本地图，微信不保证显示，建议手动换掉。' : ''), 'good');
+          return;
+        }
+
+        var toMaterial = $('pubImgMaterial') && $('pubImgMaterial').checked;
+        var i = 0, ok = 0, fails = [];
+
+        (function step() {
+          if (i >= todo.length) {
+            currentHTML = applyImgMap(currentHTML);
+            previewEl.innerHTML = currentHTML;
+            $('statBytes').textContent = currentHTML.length.toLocaleString() + ' 字节';
+            refreshImgStat();
+            pubStatus('上传完成 ✓ ' + ok + '/' + todo.length + ' 张已换成微信地址'
+              + (toMaterial ? '（已存入素材库）' : '（走正文图片接口，不占素材库配额）')
+              + (fails.length ? '<br>失败 ' + fails.length + ' 张：' + escHtml(fails[0]) : '')
+              + (other ? '<br>另有 ' + other + ' 张外链/本地图没动（微信不保证显示）' : '')
+              + '<br>可以点「发送到草稿箱」了。', fails.length ? 'bad' : 'good');
+            return;
+          }
+          var src = todo[i].src;
+          pubStatus('正在上传第 ' + (i + 1) + '/' + todo.length + ' 张…（约 ' + Math.round(src.length / 1365) + ' KB）');
+          uploadImg(src, toMaterial, function (err, url) {
+            if (err) fails.push(err.message || String(err));
+            else { imgMap[imgKey(src)] = url; saveImgMap(); ok++; }
+            i++; step();
+          });
+        })();
       }
 
       function testConn() {
@@ -1459,10 +1659,12 @@ footer: 文末引导语
         }
         if (!currentHTML) { pubStatus('正文还是空的', 'bad'); return; }
 
-        var ph = GZH.metrics(currentHTML).placeholder || 0;
-        if (ph > 0 && !window.confirm('正文里还有 ' + ph + ' 处占位图（base64）。'
-          + '微信草稿不认 base64 图片，这些图会显示不出来。\n\n确定仍要发送吗？')) {
-          pubStatus('已取消 —— 先在公众号里把占位图换成真图', 'bad'); return;
+        // currentHTML 已经套过映射，这里剩下的 base64 才是真没传的
+        var left = scanImgs(currentHTML).filter(function (it) { return it.kind === 'base64'; }).length;
+        if (left > 0 && !window.confirm('正文里还有 ' + left + ' 张 base64 内嵌图，'
+          + '微信草稿不认，发出去显示不出来。\n\n'
+          + '建议先关掉这个框，点「正文图片 › 上传并替换」，传完再发。\n\n仍要直接发送吗？')) {
+          pubStatus('已取消 —— 先点「正文图片 › 上传并替换」', 'bad'); return;
         }
 
         pubStatus('正在取 access_token…');
