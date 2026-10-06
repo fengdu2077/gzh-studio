@@ -142,7 +142,8 @@
           return;
 
         case 'hr':
-          blocks.push({ role: 'endline' });
+          // 先打占位，等全文块收齐后再分流（见文末 splitHr）
+          blocks.push({ role: '__hr__' });
           return;
 
         case 'container':
@@ -198,6 +199,28 @@
         footer: meta.footer || ''
       });
     }
+
+    /* `---` 分流：文中是节奏断点，文末那条才是 END 收尾线
+     *
+     * 同一个 `---` 有两种语义。docs/07 里 divider(第 7 项) 和 endline(第 19 项)
+     * 一直分开写着，但以前这里一律塞进 endline，于是文中每插一条分隔线
+     * 就冒出一个 END —— 因为 endline 模板里写死了 END 字样。
+     *
+     * 规则：最后一条 hr 判 endline，其余判 divider。
+     * 但若最后那条 hr 后面还跟着正文（说明它其实不在文末），降级回 divider。
+     */
+    var TAIL_ROLES = { profile: 1, signature: 1, cta: 1, endline: 1, divider: 1, '__hr__': 1 };
+    var lastHr = -1;
+    out.forEach(function (b, i) { if (b.role === '__hr__') lastHr = i; });
+
+    out.forEach(function (b, i) {
+      if (b.role !== '__hr__') return;
+      var bodyAfter = false;
+      for (var j = i + 1; j < out.length; j++) {
+        if (!TAIL_ROLES[out[j].role]) { bodyAfter = true; break; }
+      }
+      b.role = (i === lastHr && !bodyAfter) ? 'endline' : 'divider';
+    });
 
     return { v: 1, meta: meta, blocks: out };
   }

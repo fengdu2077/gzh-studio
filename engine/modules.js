@@ -204,11 +204,20 @@
 
     /* ---------- 收尾 ---------- */
 
+    /* 文中分隔线。
+     *
+     * ⚠️ 它和 endline 写起来都是 `---`，区别只在位置：文中是节奏断点，
+     * 文末那条才是 END 收尾线。分流规则在 ir.js 的 splitHr（见 toIR 末尾）。
+     * 以前两者共用 endline，导致文中每插一条分隔线就冒出一个 END。 */
+    divider: {
+      ui: { label: '分隔线', group: '正文', snippet: '---\n', hint: '---' },
+      fallback: {
+        tpl: '<section style="margin:22px 4px;"><p style="margin:0;font-size:12px;color:{{textMuted}};letter-spacing:{{letterSpacing}};text-align:center;"><span leaf="">· · ·</span></p></section>'
+      }
+    },
+
     endline: {
-      ui: [
-        { label: '分隔线', group: '正文', snippet: '---\n', hint: '---' },
-        { label: 'END 收尾线', group: '文章结尾', once: true, snippet: '---\n', hint: '文末 ---  署名区自动生成' }
-      ],
+      ui: { label: 'END 收尾线', group: '文章结尾', once: true, snippet: '---\n', hint: '文末最后一条 ---' },
       fallback: {
         tpl: '<section style="margin:26px 4px 22px;"><p style="margin:0;font-size:12px;color:{{textMuted}};letter-spacing:{{letterSpacing}};text-align:center;"><span leaf="">· · ·</span></p></section>'
       }
