@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公众号排版 · 本地渲染</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: -apple-system, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f6f8;
+      color: #1f2937;
+      font-size: 14px;
+    }
+
+    header {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .brand { font-size: 15px; font-weight: 600; color: #111827; }
+    .brand span { color: #9ca3af; font-weight: 400; font-size: 12px; margin-left: 8px; }
+    .spacer { flex: 1; }
+
+    select, button {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    select:hover, button:hover { border-color: #9ca3af; }
+
+    button.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    button.primary:hover { background: #1d4ed8; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ---------- 三栏：各自独立滚动 ---------- */
+    main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 236px minmax(300px, 1fr) 470px;
+      gap: 16px;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 1240px) {
+      main { grid-template-columns: 210px minmax(280px, 1fr) 400px; }
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+      }
+      .col { height: 62vh; }
+    }
+
+    .col {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .col > h2 {
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      background: #fafafa;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .col > h2 em {
+      font-style: normal;
+      font-weight: 400;
+      color: #9ca3af;
+      font-size: 11px;
+    }
+
+    .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+    /* ---------- 左栏：模块面板 ---------- */
+    .grp-title {
+      padding: 12px 14px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9ca3af;
+      letter-spacing: .5px;
+    }
+
+    .mod {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      border-left: 3px solid transparent;
+      border-radius: 0;
+      padding: 8px 14px;
+      background: transparent;
+      cursor: pointer;
+      color: #374151;
+    }
+
+    .mod:hover { background: #f3f4f6; border-left-color: #93c5fd; }
+    .mod:active { background: #e5e7eb; }
+
+    .mod b { display: block; font-size: 13px; font-weight: 500; }
+
+    .mod code {
+      display: block;
+      margin-top: 3px;
+      font-family: Menlo, Consolas, "Courier New", monospace;
+      font-size: 11px;
+      color: #9ca3af;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .mod.once { border-left-color: #fbbf24; }
+
+    /* ---------- 中栏：语法编辑 ---------- */
+    textarea {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      padding: 14px 16px;
+      font-family: Menlo, Consolas, "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      resize: none;
+      outline: none;
+      color: #374151;
+      overflow-y: auto;
+    }
+
+    /* ---------- 右栏：预览 ---------- */
+    .phone { background: #ffffff; padding: 18px 16px; }
+
+    #preview {
+      max-width: 375px;
+      margin: 0 auto;
+      background: #ffffff;
+      word-wrap: break-word;
+    }
+
+    .checkbar {
+      flex: 0 0 auto;
+      background: #ffffff;
+      border-top: 1px solid #e5e7eb;
+      max-height: 168px;
+      overflow-y: auto;
+    }
+
+    .bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 14px 6px;
+      font-size: 12px;
+    }
+
+    .chip {
+      padding: 3px 9px;
+      border-radius: 6px;
+      background: #f3f4f6;
+      color: #4b5563;
+      font-family: Menlo, Consolas, monospace;
+    }
+
+    .chip.bad { background: #fee2e2; color: #b91c1c; }
+    .chip.good { background: #dcfce7; color: #15803d; }
+
+    #issues { padding: 0 14px 12px; }
+
+    .issue {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #b91c1c;
+      background: #fef2f2;
+      border-left: 3px solid #f87171;
+      padding: 6px 10px;
+      margin-top: 6px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .ok-note {
+      font-size: 12px;
+      color: #15803d;
+      background: #f0fdf4;
+      border-left: 3px solid #4ade80;
+      padding: 6px 10px;
+      margin-top: 6px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .hint-note {
+      font-size: 12px;
+      line-height: 1.7;
+      color: #92400e;
+      background: #fffbeb;
+      border-left: 3px solid #fbbf24;
+      padding: 7px 11px;
+      margin-top: 6px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .hint-note code {
+      background: #fef3c7;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: Menlo, Consolas, monospace;
+    }
+
+    /* ---------- AI 提示词弹层 ---------- */
+    .mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, .38);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .mask.show { display: flex; }
+
+    .modal {
+      width: min(720px, 92vw);
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .modal > h3 {
+      margin: 0;
+      padding: 14px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .modal .body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 18px;
+      font-size: 13px;
+      line-height: 1.8;
+      color: #374151;
+    }
+
+    .modal .body pre {
+      margin: 10px 0;
+      padding: 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .modal .foot {
+      flex: 0 0 auto;
+      padding: 12px 18px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .modal .foot .spacer { flex: 1; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%);
+      background: #111827;
+      color: #ffffff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+      z-index: 99;
+      max-width: 76vw;
+      text-align: center;
+    }
+
+    .toast.show { opacity: 1; }
+    .hint { padding: 8px 14px; font-size: 12px; color: #9ca3af; line-height: 1.7; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="brand">公众号排版<span>本地渲染 · 零成本 · 干净复制</span></div>
+    <div class="spacer"></div>
+    <select id="themeSel" title="选择主题"></select>
+    <button id="aiBtn">AI 用法</button>
+    <button id="sampleBtn">载入示例</button>
+    <button id="copyBtn" class="primary" disabled>复制到公众号</button>
+  </header>
+
+  <main>
+    <!-- 左：模块 -->
+    <section class="col">
+      <h2><span>模块</span><em>点击插入</em></h2>
+      <div class="scroll" id="modules"></div>
+      <div class="hint">不会写语法也能用：点一下，语法就插到中间。</div>
+    </section>
+
+    <!-- 中：语法 -->
+    <section class="col">
+      <h2><span>排版语法</span><em id="statBlocks"></em></h2>
+      <div class="scroll" style="overflow:hidden;">
+        <textarea id="md" spellcheck="false" placeholder="左边点模块，语法会出现在这里；也可以直接粘贴一篇 Markdown。"></textarea>
+      </div>
+    </section>
+
+    <!-- 右：预览 -->
+    <section class="col">
+      <h2><span>预览</span><em id="statBytes"></em></h2>
+      <div class="scroll">
+        <div class="phone"><div id="preview"></div></div>
+      </div>
+      <div class="checkbar">
+        <div class="bar" id="bar"></div>
+        <div id="issues"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="mask" id="mask">
+    <div class="modal">
+      <h3>方式二：把稿子交给 AI 排版</h3>
+      <div class="body" id="aiBody"></div>
+      <div class="foot">
+        <span class="hint" style="padding:0;">提示词已就绪，复制后粘贴给任意 AI 即可</span>
+        <div class="spacer"></div>
+        <button id="aiCopy" class="primary">复制提示词</button>
+        <button id="aiClose">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 内置示例，不用 fetch，保证 file:// 下也能载入 -->
+  <script type="text/plain" id="sampleMd">---
+title: 这里写文章标题
+tagline: AI 实测
+account: 风渡2077
+issue: 2026.10
+kicker: 本期实测
+lede: 一句话提炼，会显示在刊头卡的导语区。
+highlights:
+  - 第一条看点，会自动编号成 01
+  - 第二条看点
+  - 第三条看点
+author: 风渡
+roleline: CREATOR · AI PRACTITIONER
+bio: 这里是作者简介，一两句话说清楚你是谁、在写什么。
+footer: 如果你觉得有收获，欢迎点赞、在看、转发三连。
+---
+
+## 第一个章节 @THE CHALLENGE
+
+刊头卡的封面图：不写 `cover` 就自动放一张占位图，把它换成你自己的即可。
+
+正文段落直接写就行，不用加任何标记。**加粗**会被渲染成深色强调，`行内代码`会渲染成浅底标签。
+
+> 引用块会变成一张白底描边的引述卡，适合放原文照抄的内容。
+
+:::note 结论 · VERDICT
+这是左侧蓝条的结论卡，用来放你自己的判断。它和上面的引述卡不同，注意别混淆。
+:::
+
+图片单独一行放。**地址留空会自动落一张占位图**，粘到公众号后替换成你自己的图：
+
+![]()
+
+## 第二个章节 @BUILD IT
+
+:::compare
+## 方案甲 | 推荐
+- 第一条理由
+- 第二条理由
+## 方案乙 | 不推荐
+- 第一个问题
+- 第二个问题
+:::
+
+视频同理 —— 公众号不能直接粘贴视频文件，所以这里会落一张占位图，
+提示你去后台「素材库 → 视频」上传后再替换：
+
+[20260917151241_rec-convert.mp4]
+
+:::cta 想试试的话
+按这个顺序走一遍就够了。
+[点这里开始](https://example.com)
+:::
+
+---
+</script>
+
+  <!-- 给 AI 的排版契约，与 docs/08-AI协作指南.md 同步 -->
+  <script type="text/plain" id="aiPrompt">你是一个公众号排版助手。我会给你一篇用标准 Markdown 写的稿子，请你把它改写成下面这套「排版语法」，然后只输出改写后的全文，不要解释、不要输出 HTML。
+
+# 动笔前必须先确认两项账号信息
+这两项跟文章内容无关，是账号级别的，不能编造：
+1. 公众号名称（account）
+2. 作者名（author）
+如果我没有告诉你，就在输出完正文之后，单独写一行提醒：
+「记得把 account 和 author 换成你自己的公众号名称和作者名。」
+
+# 排版语法
+
+## 1. 开头信息（全文最前面，用 --- 包起来，整篇只能有一份）
+---
+account: 公众号名称
+author: 作者名
+roleline: 一行身份标签
+bio: 一两句话简介
+footer: 文末引导语
+title: 文章标题
+lede: 一句话导语，提炼全文最重要的那个结论
+kicker: 栏目名
+issue: 2026.10
+cover: 
+---
+规则：
+- cover 是封面图 URL，可选。留空会自动放一张占位图，之后可以在公众号后台替换
+- front-matter 里不要写行内注释（会被当成字段值）
+- 我不知道的字段就留空，不要编造
+
+## 2. 章节标题
+## 中文标题 @ENGLISH_LABEL
+@ 后面是 2~3 个单词的英文标签（如 THE CHALLENGE / BUILD IT / REFLECTION）。
+序号会自动补，不要手写 01、02。末章也用普通编号，标签换 REFLECTION 或 SUMMARY。
+
+## 3. 看点卡（章节 ≥3 个时才写，最多 3 条）
+:::highlights 本文看点
+- 第一条看点
+- 第二条看点
+- 第三条看点
+:::
+
+## 4. 正文块
+- 普通段落直接写，**加粗**表示强调，`行内代码`表示专有名词
+- 无序列表用 - ，有序列表用 1. 2. 3.（有序会渲染成序号标签，讲步骤时优先用有序）
+- 引用别人的原话用 > 开头
+
+## 5. 容器块（用 ::: 包起来）
+:::note 结论 · VERDICT
+放作者自己的判断、结论。
+:::
+
+:::compare
+## 方案甲 | 推荐
+- 第一条理由
+## 方案乙 | 不推荐
+- 第一个问题
+:::
+
+:::cta 想试试的话
+引导读者做一个具体动作。
+[按钮文字](链接)
+:::
+
+## 6. 媒体
+- 图片：![](图片地址)，地址留空写成 ![]() 就自动放占位图
+- 视频：[文件名.mp4]，公众号不能直接粘贴视频，会自动放占位图提示上传
+
+## 7. 文末
+最后一行写一个 ---，会渲染成 END 分隔线。署名区由 author 自动生成，不用手写。
+
+# 使用纪律（必须遵守）
+- 全文只能有 1 个 END、1 个署名区
+- :::cta 一篇最多 1 个，:::highlights 一篇最多 1 个
+- 引述卡放别人的话，结论卡放自己的判断，不要混用
+- 不要输出 HTML，不要输出开头信息之外的 YAML
+
+现在，请把我的稿子改写成这套语法。</script>
+
+  <!-- 引擎（顺序有依赖：core 必须最先，placeholders 供 ir 取占位图） -->
+  <script src="../engine/core.js"></script>
+  <script src="../engine/placeholders.js"></script>
+  <script src="../engine/modules.js"></script>
+  <script src="../engine/parse.js"></script>
+  <script src="../engine/ir.js"></script>
+  <script src="../engine/sanitize.js"></script>
+  <script src="../engine/clipboard.js"></script>
+  <script src="../engine/render.js"></script>
+
+  <!-- 主题（由 check/build_theme_js.py 从 themes/*.json 生成） -->
+  <script src="../themes/index.js"></script>
+  <script src="../themes/blue-editorial.js"></script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var $ = function (id) { return document.getElementById(id); };
+      var mdEl = $('md'), previewEl = $('preview'), barEl = $('bar');
+      var issuesEl = $('issues'), themeSel = $('themeSel'), copyBtn = $('copyBtn');
+      var toastEl = $('toast');
+
+      var themes = window.GZH_THEMES || {};
+      var order = window.GZH_THEME_ORDER || Object.keys(themes);
+      var currentHTML = '';
+
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+      }
+
+      /* ---------- 左栏模块：点了就往中间插语法 ----------
+       * top:true 的模块必须落在文件最前面（front-matter 只能在开头）。
+       * once:true 表示全文只允许一个，插入时提醒，不强制拦截。
+       */
+      /* 左栏模块列表完全由 engine/modules.js 的注册表生成，这里不写死任何模块。
+       * 新增一个组件：只改 engine/modules.js 一条，本文件一行都不用动。
+       *
+       * 输出的形态与原来的手工数组一致：{ n, s, c, top, fm, once }
+       */
+      function moduleEntries() {
+        var flat = [];
+
+        // front-matter 预设（作者与公众号等）
+        Object.keys(GZH.FM_PRESETS || {}).forEach(function (k) {
+          flat.push(Object.assign({}, GZH.FM_PRESETS[k].ui));
+        });
+
+        // 正式模块：ui 可以是单个对象，也可以是数组（同一 role 多个入口）
+        Object.keys(GZH.MODULES || {}).forEach(function (role) {
+          var ui = GZH.MODULES[role].ui;
+          if (!ui) return;                       // signature 这类自动生成的没有入口
+          (Array.isArray(ui) ? ui : [ui]).forEach(function (u) {
+            flat.push(Object.assign({}, u));
+          });
+        });
+
+        return flat.map(function (u) {
+          return {
+            n: u.label, s: u.snippet, c: u.hint || '',
+            group: u.group || '正文',
+            top: !!u.top, fm: u.fm || '', once: !!u.once
+          };
+        });
+      }
+
+      var GROUPS = ['基础信息', '文章开头', '正文', '文章结尾'];
+
+      function buildModules() {
+        var box = $('modules');
+        var entries = moduleEntries();
+
+        GROUPS.forEach(function (g) {
+          var list = entries.filter(function (e) { return e.group === g; });
+          if (!list.length) return;
+
+          var t = document.createElement('div');
+          t.className = 'grp-title';
+          t.textContent = g;
+          box.appendChild(t);
+
+          list.forEach(function (it) {
+            var b = document.createElement('button');
+            b.className = 'mod' + (it.once ? ' once' : '');
+            b.innerHTML = '<b>' + it.n + '</b><code>' + escHtml(it.c) + '</code>';
+            b.title = it.once ? '全文只允许一个' : '';
+            b.addEventListener('click', function () { insert(it); });
+            box.appendChild(b);
+          });
+        });
+      }
+
+      function escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      /* front-matter 类模块：整份文档只能有一个 --- 区块，
+       * 所以「基础信息」和「刊头卡」不能各插一份，必须**合并**进同一个区块。
+       * 已存在的字段不覆盖（用户可能已经改过值），只补缺失的。
+       */
+      function mergeFrontMatter(snippet) {
+        var v = mdEl.value;
+        var m = v.match(/^\s*---\n([\s\S]*?)\n---\s*\n?/);
+
+        if (!m) {
+          mdEl.value = '---\n' + snippet.replace(/\n+$/, '') + '\n---\n\n' + v.replace(/^\n+/, '');
+          return 'created';
+        }
+
+        var have = {};
+        m[1].split('\n').forEach(function (l) {
+          var kv = l.match(/^([A-Za-z_][\w-]*)\s*:/);
+          if (kv) have[kv[1]] = 1;
+        });
+
+        var add = [], cur = null, skipped = 0;
+        snippet.split('\n').forEach(function (l) {
+          var kv = l.match(/^([A-Za-z_][\w-]*)\s*:/);
+          if (kv) {
+            cur = kv[1];
+            if (have[cur]) { cur = null; skipped++; return; }
+            have[cur] = 1;
+            add.push(l);
+          } else if (cur && /^\s*-\s+/.test(l)) {
+            add.push(l);
+          }
+        });
+
+        if (!add.length) {
+          return skipped ? 'noop' : 'noop';
+        }
+
+        var head = v.slice(0, m.index);
+        var tail = v.slice(m.index + m[0].length).replace(/^\n+/, '');
+        mdEl.value = head + '---\n' + m[1] + '\n' + add.join('\n') + '\n---\n\n' + tail;
+        return 'merged';
+      }
+
+      function insert(it) {
+        var text = it.s;
+
+        if (it.fm) {
+          var r = mergeFrontMatter(text);
+          mdEl.focus();
+          mdEl.setSelectionRange(0, 0);
+          render();
+          if (r === 'created') {
+            toast('已插入「' + it.n + '」，内容在文件最开头'
+              + (it.n === '刊头卡' ? '：cover 留空会自动放占位图，想用自己的封面就填一个图片 URL' : ''));
+          } else if (r === 'merged') {
+            toast('已把「' + it.n + '」合并进开头信息（已有字段没动）');
+          } else {
+            toast('开头信息里已经有这些字段了，直接上去改就行');
+          }
+          return;
+        }
+
+        var pos = mdEl.selectionStart;
+        var before = mdEl.value.slice(0, pos), after = mdEl.value.slice(pos);
+        var lead = (before && !/\n\s*$/.test(before)) ? '\n\n' : '';
+        var tail = (after && !/^\s*\n/.test(after)) ? '\n' : '';
+        var seg = lead + text + tail;
+
+        mdEl.value = before + seg + after;
+        var caret = pos + seg.length;
+        mdEl.focus();
+        mdEl.setSelectionRange(caret, caret);
+        render();
+        toast('已插入「' + it.n + '」' + (it.once ? '（全文只放一个）' : ''));
+      }
+
+      // 主题下拉：丢个新 JSON 进 themes/ 再跑一次生成脚本，这里自动出现
+      order.forEach(function (id) {
+        if (!themes[id]) return;
+        var op = document.createElement('option');
+        op.value = id;
+        op.textContent = themes[id].name + ' · ' + id;
+        themeSel.appendChild(op);
+      });
+
+      function currentTheme() { return themes[themeSel.value]; }
+
+      function render() {
+        var md = mdEl.value;
+        if (!md.trim()) {
+          previewEl.innerHTML = '';
+          barEl.innerHTML = '';
+          issuesEl.innerHTML = '';
+          currentHTML = '';
+          copyBtn.disabled = true;
+          return;
+        }
+
+        var ast, ir, html;
+        try {
+          ast = window.GZH.parse(md);
+          ir = window.GZH.toIR(ast);
+          html = window.GZH.render(ir, currentTheme());
+        } catch (e) {
+          issuesEl.innerHTML = '<div class="issue">渲染失败：' + e.message + '</div>';
+          currentHTML = '';
+          copyBtn.disabled = true;
+          return;
+        }
+
+        currentHTML = html;
+        previewEl.innerHTML = html;
+
+        $('statBlocks').textContent = ir.blocks.length + ' 个区块';
+        $('statBytes').textContent = html.length.toLocaleString() + ' 字节';
+
+        // 体检
+        var theme = currentTheme();
+        var v = window.GZH.verdict(window.GZH.metrics(html), theme.rules);
+        var m = v.metrics;
+
+        barEl.innerHTML = '';
+        addChip('flex', m.flex, m.flex > 0, '布局容器');
+        addChip('渐变', m.gradient, true, '');
+        addChip('start', m.start, m.start === 0, '');
+        addChip('left', m.left, m.left === 0, '');
+        addChip('leaf', m.leafSpan, m.leafSpan > 0, '叶节点');
+        addChip('污染', m.browserJunk, m.browserJunk === 0, '');
+
+        var hints = [];
+
+        // 基础信息是否齐全 —— 这几条是「用户根本不知道自己该填什么」的地方，必须明示
+        var mh = null;
+        ir.blocks.forEach(function (b) { if (b.role === 'masthead') mh = b; });
+
+        if (mh && mh.coverPlaceholder) {
+          hints.push('刊头卡封面现在用的是<b>占位图</b>。想用自己的封面，就在开头信息里给 '
+            + '<code>cover:</code> 填一个图片 URL（留空会一直用占位图；也可以粘到公众号后直接点图替换）。');
+        }
+        if (mh && !mh.account) {
+          hints.push('还没填公众号名称：在开头信息里补一行 <code>account: 你的公众号名</code>，'
+            + '刊头卡顶部眉标会显示它。');
+        }
+        if (!ir.meta || !ir.meta.author) {
+          hints.push('还没填作者名：补一行 <code>author: 你的名字</code>，'
+            + '文末才会生成署名区 —— 现在这篇没有署名卡。');
+        }
+
+        if (m.placeholder > 0) {
+          hints.push('有 <b>' + m.placeholder + ' 处是占位图</b>（含封面/配图/视频）。'
+            + '粘到公众号后，按图上的文字提示替换成你自己的素材 —— 视频要先在后台「素材库 → 视频」上传。');
+        }
+        if (m.tempLink > 0) {
+          hints.push('检测到 <b>' + m.tempLink + ' 个临时图片链接</b>（飞书云文档 / 带签名参数的直链）。'
+            + '这类链接<u>过几小时就会失效</u>，粘到公众号后会变成死图。'
+            + '建议在语法里把它们改成 <code>![]()</code>，改用占位图。');
+        }
+
+        issuesEl.innerHTML = (v.ok
+          ? '<div class="ok-note">体检通过，可以复制。</div>'
+          : v.issues.map(function (s) { return '<div class="issue">' + s + '</div>'; }).join(''))
+          + hints.map(function (s) { return '<div class="hint-note">' + s + '</div>'; }).join('');
+
+        copyBtn.disabled = !v.ok;
+      }
+
+      function addChip(label, num, good, note) {
+        var s = document.createElement('span');
+        s.className = 'chip ' + (good ? 'good' : 'bad');
+        s.textContent = label + ' ' + num + (note ? ' · ' + note : '');
+        s.title = label + ' = ' + num;
+        barEl.appendChild(s);
+      }
+
+      function copy() {
+        if (!currentHTML) return;
+        copyBtn.disabled = true;
+        // 关键：走 ClipboardItem 直写原始字符串，绝不 selectNodeContents
+        window.GZH.clipboard.write(currentHTML).then(function (r) {
+          toast('已复制 ' + r.bytes.toLocaleString() + ' 字节，去编辑器粘贴吧');
+          copyBtn.disabled = false;
+        }).catch(function (e) {
+          window.GZH.clipboard.writeFallback(previewEl).then(function (r) {
+            toast('已降级为屏幕复制：' + (r.warn || '可能带入多余样式'));
+            copyBtn.disabled = false;
+          });
+        });
+      }
+
+      /* ---------- AI 用法弹层 ---------- */
+      var mask = $('mask');
+      function openAI() {
+        $('aiBody').innerHTML =
+          '<p><b>怎么用：</b>把下面这段提示词复制给任意 AI（ChatGPT / Claude / 豆包 / Kimi 都行），'
+          + '再把它写的稿子一起发过去。AI 会直接输出这套排版语法的全文，粘回中间这栏即可。</p>'
+          + '<pre>' + escHtml($('aiPrompt').textContent.trim()) + '</pre>'
+          + '<p style="color:#6b7280;">你不需要记任何语法 —— 记语法的活交给 AI。'
+          + '本工具只负责把语法渲染成干净、可直贴公众号的 HTML。</p>';
+        mask.classList.add('show');
+      }
+      function closeAI() { mask.classList.remove('show'); }
+
+      $('aiBtn').addEventListener('click', openAI);
+      $('aiClose').addEventListener('click', closeAI);
+      mask.addEventListener('click', function (e) { if (e.target === mask) closeAI(); });
+      $('aiCopy').addEventListener('click', function () {
+        var txt = $('aiPrompt').textContent.trim();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(function () {
+            toast('提示词已复制，粘给 AI 并把稿子一起发过去');
+          }).catch(function () { toast('复制失败，请手动选中提示词复制'); });
+        } else {
+          toast('当前环境不支持一键复制，请手动选中复制');
+        }
+      });
+
+      var debounce;
+      mdEl.addEventListener('input', function () {
+        clearTimeout(debounce);
+        debounce = setTimeout(render, 220);
+      });
+      themeSel.addEventListener('change', render);
+      copyBtn.addEventListener('click', copy);
+      $('sampleBtn').addEventListener('click', function () {
+        mdEl.value = $('sampleMd').textContent.trim();
+        render();
+        toast('已载入示例，改一改就能看到实时变化');
+      });
+
+      buildModules();
+      render();
+    })();
+  </script>
+</body>
+
+</html>
