@@ -84,10 +84,13 @@
 
     masthead: {
       ui: { label: '刊头卡', group: '文章开头', once: true,
-        snippet: ':::masthead\n## 文章标题\ncover: \nkicker: 本期实测\nissue: 2026.10\n'
+        /* 默认不写 cover —— 想要封面才加那一行。
+         * 以前 snippet 里自带 `cover: `（空值=占位图），点一下就凭空多一张图，
+         * 而「刊头卡不带封面」本来是个完全正当的排版选择。 */
+        snippet: ':::masthead\n## 文章标题\nkicker: 本期实测\nissue: 2026.10\n'
           + 'account: 你的公众号名\ntagline: 一句话定位\n\n'
           + '一句话导语，提炼全文最重要的那个结论。\n:::\n',
-        hint: ':::masthead 一个盒子\ncover 留空 → 自动占位图' },
+        hint: ':::masthead 一个盒子\n不写 cover → 没有封面图\ncover 留空 → 占位图待替换' },
       grammar: {
         kind: 'container', kv: true,
         map: { title: 'title', lede: 'rest' },

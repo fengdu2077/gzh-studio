@@ -123,7 +123,7 @@
     },
     "video": {
       "from": "bare video filename",
-      "tpl": "<section style=\"margin-top:{{cardGap}};padding:20px 16px;background:{{accentSoft}};border:1px dashed {{accentTint2}};border-radius:{{radius}};\"><p style=\"margin:0 0 4px;font-size:13px;letter-spacing:{{letterSpacing}};color:{{accent}};text-align:center;\"><span leaf=\"\">待补视频</span></p><p style=\"margin:0;font-size:12px;letter-spacing:{{letterSpacing}};color:{{textMuted}};text-align:center;\"><span leaf=\"\">{{src}}</span></p></section>"
+      "tpl": "<section style=\"margin-top:{{cardGap}};\"><span style=\"display:block;\"><img src=\"{{src}}\"{{?w}} data-w=\"{{w}}\"{{/w}}{{?ratio}} data-ratio=\"{{ratio}}\"{{/ratio}} style=\"width:100%;display:block;margin:0 auto;border-radius:{{radiusSm}};\" /></span><p style=\"margin:8px 2px 0;font-size:12px;line-height:1.6;letter-spacing:{{letterSpacing}};color:{{textMuted}};text-align:center;\"><span leaf=\"\">待补视频{{?caption}} · {{caption}}{{/caption}}</span></p></section>"
     },
     "list": {
       "from": "list",

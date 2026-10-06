@@ -30,6 +30,10 @@
    *   key:
    *     - item
    */
+  // 「写了这个键但没给值」的哨兵。`cover:` 与「根本没写 cover」必须分得开：
+  // 前者是「要封面，图待补」，后者是「不要封面」。糊成一种就又把占位图强塞回去了。
+  var EMPTY = { empty: true };
+
   function parseFrontMatter(lines) {
     var meta = {};
     var cur = null;
@@ -44,11 +48,14 @@
       if (kv) {
         cur = kv[1];
         var v = unesc(kv[2].trim());
-        meta[cur] = v === '' ? [] : v;
+        meta[cur] = v === '' ? EMPTY : v;
       }
     });
-    // 空容器（高退化）统一清成 undefined，方便模板条件段判断
     Object.keys(meta).forEach(function (k) {
+      // 声明过、没值 → 空串。`cover:` 由此落到占位图；`author:` 空串仍被
+      // `if (meta.author)` 挡掉，行为和以前一致。
+      if (meta[k] === EMPTY) meta[k] = '';
+      // 空容器（高退化）清成 undefined，方便模板条件段判断
       if (Array.isArray(meta[k]) && meta[k].length === 0) meta[k] = undefined;
     });
     return meta;
@@ -179,7 +186,16 @@
 
     var out = [];
     if (meta.title && !has('masthead')) {
-      var cp = pickSrc(meta.cover, 'cover');
+      /* cover 三态在这里和 `:::masthead` 盒子（containerToBlock 的 slots）完全一致：
+       *   没写 cover     → 作者就是不要封面，一张图都不放
+       *   写了 cover:（空）→ 想要封面但还没图，放占位图提醒替换
+       *   写了真地址      → 直接用
+       *
+       * 以前这里无条件 pickSrc(meta.cover)，于是「没写」也被当成「要占位图」——
+       * 用 H1 起手的稿子（meta.title 来自 H1，根本没 front-matter）
+       * 每张都会凭空冒出一张封面占位图，想做无封面的刊头卡无从下手。
+       * 封面是**内容**，不是排版必需品：要不要图由作者决定，引擎不替他决定。 */
+      var cp = (meta.cover === undefined || meta.cover === null) ? null : pickSrc(meta.cover, 'cover');
       out.push({
         role: 'masthead',
         account: meta.account || '',
@@ -187,10 +203,10 @@
         issue: meta.issue || '',
         kicker: meta.kicker || '',
         lede: meta.lede || '',
-        // 没写 cover 时自动落封面占位图 —— 刊头卡必须有图，缺图会显得没做完
-        cover: cp.src,
+        // 没写 cover → 空串 → 模板的 {{?cover}} 整段跳过，一个 <img> 都不输出
+        cover: cp ? cp.src : '',
         // 打标记，让 UI 能明确告诉用户「封面还是占位图，可以自己填 URL」
-        coverPlaceholder: cp.placeholder,
+        coverPlaceholder: cp ? cp.placeholder : false,
         title: meta.title
       });
     }
@@ -307,7 +323,9 @@
        *   写了真地址        → 直接用
        * 以前把前两种混为一谈，导致「不写也会冒出一张占位图」，
        * 想做一个没封面的刊头根本无从下手。 */
-      if (out[field] === undefined) return;
+      // 没写就是没写：连 Placeholder 标记也一并置 false，
+      // 两条路径（盒子 / front-matter）交出来的 IR 形状保持一致。
+      if (out[field] === undefined) { out[field + 'Placeholder'] = false; return; }
       var p = pickSrc(out[field], g.slots[field]);
       out[field] = p.src;
       if (p.w) { out.w = p.w; out.ratio = p.ratio; }
