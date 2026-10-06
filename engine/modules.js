@@ -162,7 +162,9 @@
       ui: { label: '结论卡', group: '正文',
         snippet: ':::note 结论 · VERDICT\n这里写你自己的判断。\n:::\n',
         hint: ':::note 标题' },
-      grammar: { kind: 'container', static: { title: '' }, map: { label: 'label', text: 'join' } },
+      // kv: 让 `title: xxx` 生效 —— 结论卡是「金色标签 + 白色大标题 + 正文」三段，
+      // 少了 kv 就只剩 label 和 text，标题永远为空（模板里的 {{?title}} 也就永远不显示）
+      grammar: { kind: 'container', kv: true, static: { title: '' }, map: { label: 'label', text: 'join' } },
       fallback: {
         tpl: '<section style="margin-top:{{cardGap}};border-left:3px solid {{accent}};padding:2px 0 2px 14px;">{{?label}}<p style="margin:0 0 6px;font-size:9px;font-weight:800;letter-spacing:{{letterSpacing}};color:{{accent}};"><span leaf="">{{label}}</span></p>{{/label}}<p style="margin:0;font-size:{{fontSize}};line-height:{{lineHeight}};text-align:{{align}};color:{{textMain}};letter-spacing:{{letterSpacing}};"><span leaf="">{{text}}</span></p></section>'
       }

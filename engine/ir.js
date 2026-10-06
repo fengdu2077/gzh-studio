@@ -99,9 +99,20 @@
           return;
         }
 
-        case 'quote':
-          blocks.push({ role: 'quote', label: 'PROMPT · 原话', text: unesc(b.text) });
+        case 'quote': {
+          /* 末行的 `@出处` 是来源，和章节标题的 `@ENGLISH` 同一套语法。
+           * 以前 label 恒为写死的 'PROMPT · 原话'，作者想写自己的出处也改不了；
+           * 现在写了 @ 就用作者的，没写仍退回原默认值（老稿输出不变）。 */
+          var qt = unesc(b.text || '');
+          var qlabel = 'PROMPT · 原话';
+          var qm = /(?:^|\n)[ \t]*@([^\n]+)[ \t]*$/.exec(qt);
+          if (qm) {
+            qlabel = qm[1].trim();
+            qt = qt.slice(0, qm.index).replace(/[ \t\n]+$/, '');
+          }
+          blocks.push({ role: 'quote', label: qlabel, text: qt });
           return;
+        }
 
         case 'image': {
           var p = pickSrc(b.src, 'image');
@@ -240,6 +251,18 @@
    * ⚠️ map 的遍历顺序有语义：link 提取器会把链接从末行删掉，
    * 所以必须排在 join 前面，否则正文里会残留链接原文。
    */
+  /* 把容器正文里的 `key: value` 行删掉（只删整行都是 kv 的，不动正常段落）。
+   * 删的是副本，不改调用方的 body。 */
+  function stripKVLines(inner) {
+    return (inner || []).map(function (node) {
+      if (node.type !== 'paragraph') return node;
+      var kept = String(node.text).split('\n').filter(function (line) {
+        return !/^[A-Za-z_][\w-]*\s*:/.test(line.trim());
+      }).join('\n');
+      return Object.assign({}, node, { text: kept });
+    });
+  }
+
   function containerToBlock(b) {
     var def = GZH.MODULES && GZH.MODULES[b.name];
     var g = def && def.grammar;
@@ -262,16 +285,29 @@
 
     Object.keys(g.static || {}).forEach(function (k) { out[k] = g.static[k]; });
 
+    // kv 行被读成字段之后，就该从正文里消失。
+    // 以前不剔除，于是 `:::note` 里写 `title: xxx`，标题拿到了、
+    // 正文里还留着一行「title: xxx」—— 因为正文用的是 join 提取器，
+    // 它不像 rest 那样会跳过 kv 行。在这里统一剔除，所有提取器都受益。
+    var body = b.body;
     if (g.kv) {
       collectKV(b.body).forEach(function (pair) { out[pair[0]] = pair[1]; });
+      body = stripKVLines(b.body);
     }
 
     Object.keys(g.map || {}).forEach(function (field) {
       var ex = GZH.EXTRACTORS[g.map[field]];
-      if (ex) out[field] = ex(b, helpers);
+      if (ex) out[field] = ex(Object.assign({}, b, { body: body }), helpers);
     });
 
     Object.keys(g.slots || {}).forEach(function (field) {
+      /* 三种情况要分清：
+       *   没写 cover 键     → 用户就是不要封面，什么都不生成
+       *   写了 cover: （空） → 想要封面但还没图，放占位图提醒替换
+       *   写了真地址        → 直接用
+       * 以前把前两种混为一谈，导致「不写也会冒出一张占位图」，
+       * 想做一个没封面的刊头根本无从下手。 */
+      if (out[field] === undefined) return;
       var p = pickSrc(out[field], g.slots[field]);
       out[field] = p.src;
       if (p.w) { out.w = p.w; out.ratio = p.ratio; }

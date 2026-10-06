@@ -15,6 +15,7 @@
 | **渲染引擎六个模块** | ✅ `engine/`：modules（注册表）/ parse / ir / render / sanitize / clipboard |
 | **三栏可视化工作台** | ✅ `app/index.html`，双击即用，file:// 实测通过 |
 | 多主题（第 2 套） | ✅ `blue-gradient` 渐变版（135deg 卡片渐变，会触发微信渐变提示） |
+| 多主题（第 3 套） | ✅ `mist-editorial` 雾青编辑（深墨青 + 雾青 + 金色，零渐变） |
 | 封面图 / 视频素材自动化 | ⬜ 纯静态做不到，需服务端 |
 
 ## 怎么跑起来
@@ -33,10 +34,12 @@
 
 右上角：
 
-- **主题**下拉两套：
+- **主题**下拉三套：
   - `blue-editorial` 无渐变版 —— 已实测零告警，**要发正式文章用这套**
   - `blue-gradient` 渐变版 —— 卡片是 135deg 渐变、分隔线是渐变线，即最初照参考成品复刻的效果；
     代价是会触发微信 `darkmode-no-gradient` 提示，手机深色模式下渐变卡内的字可能变淡
+  - `mist-editorial` 雾青编辑 —— 深墨青 `#17262C` + 雾青 `#4E8FA3` + 金色 `#E2A341`，
+    浅金底荧光笔加粗；零渐变，杂志感更强。对照稿见 `samples/demo-mist.md`
 - **配色**：改 7 个主色，右侧即时预览；改满意了导出成一套新主题，或下载 `.js` 发给朋友
   （对方用「导入主题」打开即可，**不用装 Python**）。详见 `docs/08` §2.4
 - **AI 用法**：弹层里是一份提示词，复制给任意 AI + 你的稿子，AI 直接吐排版语法（详见 `docs/08`）
@@ -86,6 +89,9 @@
 | -- | -- |
 | `node check/test_engine.js` | 跑 `samples/demo.md` 全流程，输出 role 分布与体检结论 |
 | `node check/test_engine.js --sample` | 跑 App 内置示例（覆盖本套主题已实现的 14 个组件） |
+| `node check/test_recolor.js` | 换主色守卫：遍历全部主题，旧色残留必须为 0 |
+| `node check/test_theme_coverage.js` | 全组件覆盖：每套主题的每个组件单独渲染，不许空、不许有 `{{` 残留 |
+| `node check/test_divider.js` | 分隔线与 END 收尾线的分流规则 |
 | `python check/smoke_app.py` | 真实 Chromium 以 `file://` 打开，检查报错、三栏滚动、模块插入、复制链路 |
 | `python check/inspect_skeleton.py <html>` | 把成品摊平成模块清单，用于和原成品做 diff |
 | `python check/check_published.py <url\|mhtml>` | 发布后体检，退出码 1 = 不干净 |

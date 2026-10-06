@@ -62,7 +62,8 @@
     codeColor: '#2563eb',
     linkColor: '#2563eb',
     linkLine: '#bfdbfe',
-    strongColor: '#111827'
+    strongColor: '#111827',
+    strongBg: ''   // 空 = 不加底，只加粗上色（老主题的行为）
   };
 
   function inline(text, style) {
@@ -74,6 +75,9 @@
     var codeBg = pick('codeBg'), codeColor = pick('codeColor');
     var linkColor = pick('linkColor'), linkLine = pick('linkLine');
     var strongColor = pick('strongColor');
+    // 荧光笔：给了底色的加粗才会带底。不给就是纯加粗，
+    // 所以「没声明」的主题输出与以前逐字节一致。
+    var strongBg = pick('strongBg');
 
     var out = esc(text);
 
@@ -87,9 +91,11 @@
       return '<a href="' + escAttr(href) + '" style="color:' + linkColor + ';text-decoration:none;border-bottom:1px solid ' + linkLine + ';">' + t + '</a>';
     });
 
-    // **加粗**
+    // **加粗**（strongBg 非空时是荧光笔效果）
+    var strongStyle = 'color:' + strongColor + ';font-weight:600;'
+      + (strongBg ? 'background:' + strongBg + ';padding:1px 3px;' : '');
     out = out.replace(/\*\*([^*]+)\*\*/g, function (m, t) {
-      return '<span style="color:' + strongColor + ';font-weight:600;">' + t + '</span>';
+      return '<span style="' + strongStyle + '">' + t + '</span>';
     });
 
     return out;
