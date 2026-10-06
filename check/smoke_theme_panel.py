@@ -52,6 +52,11 @@ with sync_playwright() as p:
     pg.goto(APP)
     pg.wait_for_timeout(700)
 
+    # 内置主题套数（themes/ 下有几套）—— 后面的断言都写相对值，
+    # 否则往 themes/ 加一套主题，这个测试就会假失败
+    BASE = len(sel_options(pg))
+    print('   内置主题 %d 套: %s' % (BASE, sel_options(pg)))
+
     pg.click('#sampleBtn')
     pg.wait_for_timeout(400)
     before = pg.inner_html('#preview')
@@ -95,12 +100,12 @@ with sync_playwright() as p:
     # ---- 就地注册 + 持久化 ----
     print('⑤ 导出后')
     opts = sel_options(pg)
-    check('下拉里出现新主题', len(opts) == 2, str(opts))
+    check('下拉里出现新主题', len(opts) == BASE + 1, str(opts))
 
     pg.reload()
     pg.wait_for_timeout(800)
     opts2 = sel_options(pg)
-    check('刷新后仍在（localStorage 持久化）', len(opts2) == 2, str(opts2))
+    check('刷新后仍在（localStorage 持久化）', len(opts2) == BASE + 1, str(opts2))
 
     # ---- 朋友侧：拿到文件用「导入主题」打开 ----
     print('⑥ 另一台机器（新页面 = 新的 localStorage）')
@@ -109,12 +114,12 @@ with sync_playwright() as p:
     pg2.on('pageerror', lambda e: errs2.append(str(e)))
     pg2.goto(APP)
     pg2.wait_for_timeout(700)
-    check('导入前只有 1 套主题', len(sel_options(pg2)) == 1, str(sel_options(pg2)))
+    check('导入前是内置的 %d 套' % BASE, len(sel_options(pg2)) == BASE, str(sel_options(pg2)))
 
     pg2.set_input_files('#themeFile', str(OUT))
     pg2.wait_for_timeout(700)
     opts3 = sel_options(pg2)
-    check('导入后多出 1 套', len(opts3) == 2, str(opts3))
+    check('导入后多出 1 套', len(opts3) == BASE + 1, str(opts3))
 
     pg2.click('#sampleBtn')
     pg2.wait_for_timeout(400)

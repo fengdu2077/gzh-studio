@@ -105,18 +105,6 @@
       "tpl": "<section style=\"margin:26px 4px 22px;display:flex;align-items:center;gap:12px;\"><span style=\"height:1px;background:linear-gradient(90deg,rgba({{accentRgb}},0),{{accentLine}});flex:1;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"> </span></span><span style=\"font-size:9px;font-weight:800;letter-spacing:{{letterSpacing}};color:{{accent}};\"><span leaf=\"\">END</span></span><span style=\"height:1px;background:linear-gradient(90deg,{{accentLine}},rgba({{accentRgb}},0));flex:1;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"> </span></span></section>"
     }
   },
-  "variants": {
-    "default": {
-      "name": "科技刊读风（无渐变，默认）"
-    },
-    "with-gradient": {
-      "name": "科技刊读风（带渐变卡）",
-      "note": "会触发微信 darkmode-no-gradient 提示，且手机深色模式下渐变卡内的字可能看不见。谨慎使用。",
-      "overrides": {
-        "rules.maxGradient135": 2
-      }
-    }
-  },
   "rules": {
     "maxGradient135": 0,
     "maxGradientTotal": 3,

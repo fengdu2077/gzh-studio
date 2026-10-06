@@ -961,8 +961,8 @@ footer: 文末引导语
       var COLOR_KEYS = [
         ['accent', '主色', '标题、序号、强调'],
         ['accentSub', '副色', '次级强调'],
-        ['accentSoft', '浅底', '行内代码底色、卡片淡底'],
-        ['accentSoft2', '浅底 2', '更淡的底色'],
+        ['accentSoft', '浅底', '行内代码底色、卡片淡底、渐变卡起点'],
+        ['accentSoft2', '浅底 2', '更淡的底色、署名与行动卡渐变起点'],
         ['accentTint', '边框', '卡片描边'],
         ['accentTint2', '下划线', '链接下划线'],
         ['accentLine', '装饰线', '分隔线、渐变端点']
@@ -975,7 +975,9 @@ footer: 文末引导语
         if (!t) { toast('先选一个主题'); return; }
 
         var html = '<p style="margin:0 0 12px;color:#6b7280;">改完右侧预览会立刻变。'
-          + '满意了就点「导出主题文件」，拿到的是一个能直接用的主题文件。</p>';
+          + '满意了就点「导出主题文件」，拿到的是一个能直接用的主题文件。</p>'
+          + '<p style="margin:0 0 12px;color:#92400e;">卡片和渐变线的底色由「浅底」决定，'
+          + '只拖主色不会变 —— 想整套换色，7 个都要改。</p>';
 
         COLOR_KEYS.forEach(function (row) {
           var key = row[0], label = row[1], note = row[2];
