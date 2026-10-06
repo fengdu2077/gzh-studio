@@ -19,6 +19,17 @@
     'issue', 'account', 'cover', 'caption', 'label', 'bio', 'footer',
     'author', 'initial', 'roleline', 'action', 'badge'];
 
+  /* 主题整理结果做单槽缓存：一次渲染里 theme 是同一个对象，
+   * 不必每个 block 都重算一遍派生与引用展开。 */
+  var _prepKey = null, _prepVal = null;
+
+  function prepared(theme) {
+    if (_prepKey === theme && _prepVal) return _prepVal;
+    _prepKey = theme;
+    _prepVal = GZH.prepareTheme(theme);
+    return _prepVal;
+  }
+
   function buildVars(theme, block) {
     return Object.assign({}, theme.tokens, theme.base, block);
   }
@@ -48,15 +59,15 @@
       var v = buildVars(theme, block);
 
       if (typeof raw === 'string') {
-        v.text = inline(raw);
+        v.text = inline(raw, theme.inlineStyle);
       } else {
         Object.keys(raw).forEach(function (k) {
-          v[k] = typeof raw[k] === 'string' ? inline(raw[k]) : raw[k];
+          v[k] = typeof raw[k] === 'string' ? inline(raw[k], theme.inlineStyle) : raw[k];
         });
         // 一栏底下的多条理由
         if (comp.subitem && Array.isArray(raw.items)) {
           v.items = raw.items.map(function (t) {
-            return fill(comp.subitem, Object.assign(buildVars(theme, block), { text: inline(t) }));
+            return fill(comp.subitem, Object.assign(buildVars(theme, block), { text: inline(t, theme.inlineStyle) }));
           }).join('');
         }
       }
@@ -67,7 +78,9 @@
     }).join('');
   }
 
-  function renderBlock(theme, block) {
+  function renderBlock(rawTheme, block) {
+    // 主题先过一遍派生与引用展开，后面拿到的 token 都是可直接用的字面量
+    var theme = prepared(rawTheme);
     var comp = (theme.components && theme.components[block.role]) || GZH.FALLBACK[block.role];
     if (!comp) return '';
 
@@ -76,7 +89,7 @@
     // 行内字段统一过一遍 inline()（内部已做 HTML 转义）
     Object.keys(block).forEach(function (k) {
       if (INLINE_FIELDS.indexOf(k) >= 0 && typeof block[k] === 'string') {
-        v[k] = inline(block[k]);
+        v[k] = inline(block[k], theme.inlineStyle);
       }
     });
 

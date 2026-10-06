@@ -21,8 +21,8 @@
     "textMain": "#374151",
     "textStrong": "#111827",
     "textMuted": "#9ca3af",
-    "shadow": "0 3px 12px rgba(37,99,235,0.06)",
-    "shadowMasthead": "0 4px 14px rgba(37,99,235,0.06)",
+    "shadow": "0 3px 12px rgba({{accentRgb}},0.06)",
+    "shadowMasthead": "0 4px 14px rgba({{accentRgb}},0.06)",
     "radius": "12px"
   },
   "base": {
@@ -40,7 +40,7 @@
   "components": {
     "masthead": {
       "from": ":::masthead（旧稿兼容 front-matter）",
-      "tpl": "<section style=\"background:{{cardBg}};border:1px solid {{accentTint}};border-radius:{{radius}};box-shadow:{{shadowMasthead}};overflow:hidden;\"><section style=\"padding:13px 16px 12px;display:flex;align-items:center;\"><span style=\"width:7px;height:7px;background:{{accent}};border-radius:50%;display:inline-block;flex-shrink:0;font-size:0;line-height:0;\"><span leaf=\"\"><br></span></span><span style=\"font-size:9px;letter-spacing:{{letterSpacing}};color:{{accent}};margin-left:6px;\"><span leaf=\"\">{{account}} · {{tagline}}</span></span><span style=\"flex:1;height:1px;background:linear-gradient(90deg,{{accentTint2}},rgba(191,219,254,0));margin-left:8px;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"><br></span></span><span style=\"font-size:9px;letter-spacing:{{letterSpacing}};color:{{textMuted}};margin-left:8px;\"><span leaf=\"\">{{issue}}</span></span></section>{{?cover}}<figure style=\"margin:0;line-height:0;\"><span leaf=\"\"><img data-w=\"1080\" data-ratio=\"0.4259\" style=\"max-width:100%;height:auto;display:block;margin:0 auto;\" src=\"{{cover}}\" /></span></figure>{{/cover}}{{?lede}}<section style=\"padding:15px 17px 17px;background:{{accentSoft}};border-top:1px solid {{accentTint}};\"><p style=\"margin:0 0 7px;font-size:9px;letter-spacing:{{letterSpacing}};color:{{accent}};\"><span leaf=\"\">EDITOR’S NOTE · {{kicker}}</span></p><p style=\"margin:0;font-size:{{fontSize}};line-height:1.7;color:{{textStrong}};\"><span leaf=\"\">{{lede}}</span></p></section>{{/lede}}</section>"
+      "tpl": "<section style=\"background:{{cardBg}};border:1px solid {{accentTint}};border-radius:{{radius}};box-shadow:{{shadowMasthead}};overflow:hidden;\"><section style=\"padding:13px 16px 12px;display:flex;align-items:center;\"><span style=\"width:7px;height:7px;background:{{accent}};border-radius:50%;display:inline-block;flex-shrink:0;font-size:0;line-height:0;\"><span leaf=\"\"><br></span></span><span style=\"font-size:9px;letter-spacing:{{letterSpacing}};color:{{accent}};margin-left:6px;\"><span leaf=\"\">{{account}} · {{tagline}}</span></span><span style=\"flex:1;height:1px;background:linear-gradient(90deg,{{accentTint2}},rgba({{accentTint2Rgb}},0));margin-left:8px;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"><br></span></span><span style=\"font-size:9px;letter-spacing:{{letterSpacing}};color:{{textMuted}};margin-left:8px;\"><span leaf=\"\">{{issue}}</span></span></section>{{?cover}}<figure style=\"margin:0;line-height:0;\"><span leaf=\"\"><img data-w=\"1080\" data-ratio=\"0.4259\" style=\"max-width:100%;height:auto;display:block;margin:0 auto;\" src=\"{{cover}}\" /></span></figure>{{/cover}}{{?lede}}<section style=\"padding:15px 17px 17px;background:{{accentSoft}};border-top:1px solid {{accentTint}};\"><p style=\"margin:0 0 7px;font-size:9px;letter-spacing:{{letterSpacing}};color:{{accent}};\"><span leaf=\"\">EDITOR’S NOTE · {{kicker}}</span></p><p style=\"margin:0;font-size:{{fontSize}};line-height:1.7;color:{{textStrong}};\"><span leaf=\"\">{{lede}}</span></p></section>{{/lede}}</section>"
     },
     "highlights": {
       "from": "front-matter highlights",
@@ -98,7 +98,7 @@
     },
     "endline": {
       "from": "trailing hr",
-      "tpl": "<section style=\"margin:26px 4px 22px;display:flex;align-items:center;gap:12px;\"><span style=\"height:1px;background:linear-gradient(90deg,rgba(37,99,235,0),{{accentLine}});flex:1;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"> </span></span><span style=\"font-size:9px;font-weight:800;letter-spacing:{{letterSpacing}};color:{{accent}};\"><span leaf=\"\">END</span></span><span style=\"height:1px;background:linear-gradient(90deg,{{accentLine}},rgba(37,99,235,0));flex:1;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"> </span></span></section>"
+      "tpl": "<section style=\"margin:26px 4px 22px;display:flex;align-items:center;gap:12px;\"><span style=\"height:1px;background:linear-gradient(90deg,rgba({{accentRgb}},0),{{accentLine}});flex:1;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"> </span></span><span style=\"font-size:9px;font-weight:800;letter-spacing:{{letterSpacing}};color:{{accent}};\"><span leaf=\"\">END</span></span><span style=\"height:1px;background:linear-gradient(90deg,{{accentLine}},rgba({{accentRgb}},0));flex:1;display:inline-block;overflow:hidden;font-size:0;line-height:0;\"><span leaf=\"\"> </span></span></section>"
     }
   },
   "variants": {
