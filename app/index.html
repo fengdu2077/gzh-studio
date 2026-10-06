@@ -359,6 +359,42 @@
       width: 148px; padding: 5px 8px; font-size: 12px;
       border: 1px solid #e5e7eb; border-radius: 6px; color: #374151;
     }
+    .crow input[type=text] {
+      padding: 5px 8px; font-size: 12px;
+      border: 1px solid #e5e7eb; border-radius: 6px; color: #374151;
+    }
+    button.mini {
+      padding: 5px 10px; font-size: 12px; border-radius: 6px;
+      border: 1px solid #e5e7eb; background: #f9fafb; color: #374151;
+    }
+    button.mini:hover { background: #f3f4f6; }
+    .pub-note {
+      margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 12px;
+      line-height: 1.7; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;
+    }
+    .pub-note.good { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .pub-note.bad { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .pub-note code {
+      font-family: Menlo, Consolas, monospace; font-size: 11px;
+      background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 4px;
+    }
+    .pub-help {
+      margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 12px;
+      line-height: 1.8; background: #fffbeb; border: 1px solid #fde68a; color: #78350f;
+    }
+    .pub-pick-list {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px;
+    }
+    .pub-pick-item {
+      cursor: pointer; border: 1px solid #e5e7eb; border-radius: 6px;
+      overflow: hidden; background: #fff; text-align: center;
+    }
+    .pub-pick-item:hover { border-color: #2563eb; }
+    .pub-pick-item img { width: 100%; height: 56px; object-fit: cover; display: block; }
+    .pub-pick-item span {
+      display: block; font-size: 10px; padding: 3px 4px; color: #6b7280;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
   </style>
 </head>
 
@@ -369,6 +405,7 @@
     <select id="themeSel" title="选择主题"></select>
     <button id="colorBtn">配色</button>
     <button id="aiBtn">AI 用法</button>
+    <button id="pubBtn">发布到草稿箱</button>
     <button id="sampleBtn">载入示例</button>
     <button id="copyBtn" class="primary" disabled>复制到公众号</button>
   </header>
@@ -429,7 +466,23 @@
     </div>
   </div>
 
+  <!-- 发布到草稿箱：配置 + 状态 -->
+  <div class="mask" id="pubMask">
+    <div class="modal" style="width:min(720px,94vw);">
+      <h3>发布到公众号草稿箱<button id="pubClose" class="xbtn" title="关闭">×</button></h3>
+      <div class="body" id="pubBody"></div>
+      <div class="foot">
+        <span class="hint" style="padding:0;">密钥只存在本机浏览器里，不会写进主题文件，也不会上传给任何第三方</span>
+        <div class="spacer"></div>
+        <button id="pubClear">清除密钥</button>
+        <button id="pubTest">测试连接</button>
+        <button id="pubSend" class="primary">发送到草稿箱</button>
+      </div>
+    </div>
+  </div>
+
   <input type="file" id="themeFile" accept=".js,.json" style="display:none;">
+  <input type="file" id="thumbFile" accept="image/*" style="display:none;">
 
   <div class="toast" id="toast"></div>
 
@@ -816,6 +869,8 @@ footer: 文末引导语
         }
 
         var ast, ir, html;
+        // 发布面板要从 IR 里取标题/作者，存一份引用，避免为了取标题再解析一次稿子
+        window.__gzhLastIR = null;
         try {
           ast = window.GZH.parse(md);
           ir = window.GZH.toIR(ast);
@@ -829,6 +884,7 @@ footer: 文末引导语
 
         currentHTML = html;
         previewEl.innerHTML = html;
+        window.__gzhLastIR = ir;
 
         $('statBlocks').textContent = ir.blocks.length + ' 个区块';
         $('statBytes').textContent = html.length.toLocaleString() + ' 字节';
@@ -1127,6 +1183,373 @@ footer: 文末引导语
         r.onerror = function () { toast('读文件失败'); };
         r.readAsText(file);
         ev.target.value = '';
+      });
+
+      /* ============================================================
+       * 发布到公众号草稿箱
+       *
+       * 为什么不能直接在页面里 fetch 微信：
+       *   api.weixin.qq.com 不返回 Access-Control-Allow-Origin，浏览器会直接拦掉
+       *   （file:// 页面 origin 是 null，更严格）。所以请求必须先经过本机那个
+       *   零依赖代理（tools/wechat-proxy.js），由它补 CORS 头再转发。
+       *   代理只监听 127.0.0.1，且只能转发到 api.weixin.qq.com。
+       *
+       * 密钥存哪：localStorage（file:// 实测可写）。**不写进导出主题、不上传任何第三方。**
+       * 这是权衡后的选择 —— 公众号后台的 IP 白名单 + 本机代理已经把风险压到很小，
+       * 但 AppSecret 仍然是明文存在浏览器里，所以面板里给了「清除密钥」。
+       * ============================================================ */
+      var LS_PUB = 'gzh.publish';
+
+      var pubCfg = (function () {
+        try { return JSON.parse(lsGet(LS_PUB) || '{}') || {}; } catch (e) { return {}; }
+      })();
+      function savePub() { lsSet(LS_PUB, JSON.stringify(pubCfg)); }
+
+      var pubMask = $('pubMask'), pubBody = $('pubBody');
+
+      // 微信常见 errcode → 人话。尤其 40164（IP 白名单）必须先讲清楚，
+      // 否则用户只会看到「invalid ip」，根本不知道要去后台加白名单。
+      var WX_ERR = {
+        40001: 'access_token 无效或已过期 —— 重新点「测试连接」取一个',
+        40013: 'AppID 不对 —— 去公众号后台「基本配置」核对',
+        40014: 'access_token 不合法',
+        40125: 'AppSecret 不对 —— 去公众号后台「基本配置」重置或核对',
+        40164: '调用方 IP 不在白名单 —— 把上面那个「本机公网 IP」加进公众号后台「设置与开发 › 基本配置 › IP白名单」',
+        41001: '缺少 access_token',
+        45009: '接口调用超过限额（草稿接口每天有限额）',
+        48001: 'API 功能未授权 —— 订阅号/未认证号很多接口没有权限',
+        53404: '账号已被限制调用该接口',
+        45001: '多媒体文件超过大小限制',
+        40007: '无效的 media_id —— 封面素材不存在或不是永久素材'
+      };
+      function wxErrText(data) {
+        if (!data || data.errcode === undefined || data.errcode === 0) return '';
+        var known = WX_ERR[data.errcode];
+        return 'errcode ' + data.errcode + '：' + (known || data.errmsg || '未知错误')
+          + (known ? '' : '（' + (data.errmsg || '') + '）');
+      }
+
+      function proxyBase() {
+        return (pubCfg.proxy || 'http://127.0.0.1:8787').replace(/\/+$/, '');
+      }
+
+      // 统一的代理请求。代理没起时给出可操作的提示，而不是让用户面对一个 fetch 报错。
+      function wxApi(path, query, body, cb) {
+        var url = proxyBase() + '/wx/' + path + (query ? '?' + query : '');
+        var opt = { method: body ? 'POST' : 'GET' };
+        if (body) {
+          if (body instanceof FormData) opt.body = body;                       // 素材上传（带 boundary）
+          else { opt.headers = { 'Content-Type': 'application/json' }; opt.body = JSON.stringify(body); }
+        }
+        fetch(url, opt).then(function (r) {
+          return r.text().then(function (t) {
+            var d = null;
+            try { d = JSON.parse(t); } catch (e) { d = { raw: t }; }
+            cb(null, d);
+          });
+        }).catch(function (e) {
+          cb(new Error('连不上本机代理（' + proxyBase() + '）。先在项目目录跑：node tools/wechat-proxy.js'
+            + '　—— 浏览器不能直连微信 API，必须走这层。'));
+        });
+      }
+
+      function proxyGet(path, cb) {
+        fetch(proxyBase() + path).then(function (r) { return r.json(); })
+          .then(function (d) { cb(null, d); })
+          .catch(function (e) { cb(new Error('连不上本机代理（' + proxyBase() + '）。先跑：node tools/wechat-proxy.js')); });
+      }
+
+      function pubStatus(html, kind) {
+        var el = $('pubStatus');
+        if (el) el.innerHTML = '<div class="pub-note ' + (kind || '') + '">' + html + '</div>';
+      }
+
+      function openPub() {
+        var t = currentTheme();
+        pubBody.innerHTML = ''
+          // ① 代理
+          + '<div class="crow"><span class="crow-k"><b>本机代理</b>'
+          + '<em>浏览器不能直连微信 API，必须走这层。在项目目录跑：<code>node tools/wechat-proxy.js</code></em></span>'
+          + '<input type="text" id="pubProxy" style="width:190px" value="' + (pubCfg.proxy || 'http://127.0.0.1:8787') + '">'
+          + '<button id="pubPing" class="mini">检测</button></div>'
+
+          // ② 公网 IP
+          + '<div class="crow"><span class="crow-k"><b>本机公网 IP</b>'
+          + '<em>填进公众号后台「设置与开发 › 基本配置 › IP白名单」，不然拿不到 token（errcode 40164）</em></span>'
+          + '<code class="crow-v" id="pubIp" style="min-width:110px;">' + (pubCfg.lastIp || '未获取') + '</code>'
+          + '<button id="pubIpBtn" class="mini">查 IP</button>'
+          + '<button id="pubIpCopy" class="mini">复制</button></div>'
+
+          // ③ 密钥
+          + '<div class="crow"><span class="crow-k"><b>AppID</b>'
+          + '<em>公众号后台「设置与开发 › 基本配置」</em></span>'
+          + '<input type="text" id="pubAppId" style="width:210px" value="' + (pubCfg.appId || '') + '" placeholder="wx........"></div>'
+          + '<div class="crow"><span class="crow-k"><b>AppSecret</b>'
+          + '<em>只存在本机浏览器，不写进主题文件、不外传</em></span>'
+          + '<input type="password" id="pubSecret" style="width:210px" value="' + (pubCfg.appSecret || '') + '" placeholder="点「测试连接」才会用到">'
+          + '<button id="pubEye" class="mini">显示</button></div>'
+
+          // ④ 稿件字段
+          + '<div class="crow"><span class="crow-k"><b>作者</b><em>留空则取稿子里 :::profile 的 author</em></span>'
+          + '<input type="text" id="pubAuthor" style="width:210px" value="' + (pubCfg.author || '') + '"></div>'
+          + '<div class="crow"><span class="crow-k"><b>原文链接</b><em>可选，文末「阅读原文」</em></span>'
+          + '<input type="text" id="pubSrcUrl" style="width:210px" value="' + (pubCfg.sourceUrl || '') + '" placeholder="https://"></div>'
+          + '<div class="crow"><span class="crow-k"><b>摘要</b><em>可选，留空微信会自动截取</em></span>'
+          + '<input type="text" id="pubDigest" style="width:210px" value="' + (pubCfg.digest || '') + '"></div>'
+
+          // ⑤ 封面（草稿接口必填 thumb_media_id）
+          + '<div class="crow"><span class="crow-k"><b>封面 media_id</b>'
+          + '<em>草稿接口必填。必须是素材库里的<b>永久图片</b>素材</em></span>'
+          + '<input type="text" id="pubThumb" style="width:210px" value="' + (pubCfg.thumbMediaId || '') + '" placeholder="还没选">'
+          + '<button id="pubPick" class="mini">从素材库选</button>'
+          + '<button id="pubUpload" class="mini">上传一张</button></div>'
+
+          + '<div id="pubStatus"></div>'
+          + '<div class="pub-help">'
+          + '<b>三个前提，缺一不可：</b>'
+          + '① 公众号是<b>认证</b>的服务号/订阅号（未认证号没有草稿接口权限）；'
+          + '② 本机公网 IP 已加进<b>IP 白名单</b>；'
+          + '③ AppID / AppSecret 填对。'
+          + '<br>代理只在你需要发稿时开着，不发稿可以关掉（Ctrl+C）。'
+          + '</div>';
+
+        bindPub(t);
+        pubMask.classList.add('show');
+      }
+
+      function bindPub(t) {
+        function readCfg() {
+          pubCfg.proxy = $('pubProxy').value.trim();
+          pubCfg.appId = $('pubAppId').value.trim();
+          pubCfg.appSecret = $('pubSecret').value;
+          pubCfg.author = $('pubAuthor').value.trim();
+          pubCfg.sourceUrl = $('pubSrcUrl').value.trim();
+          pubCfg.digest = $('pubDigest').value.trim();
+          pubCfg.thumbMediaId = $('pubThumb').value.trim();
+          savePub();
+        }
+        ['pubProxy', 'pubAppId', 'pubSecret', 'pubAuthor', 'pubSrcUrl', 'pubDigest', 'pubThumb']
+          .forEach(function (id) {
+            var el = $(id);
+            if (el) el.addEventListener('change', readCfg);
+          });
+
+        $('pubPing').addEventListener('click', function () {
+          readCfg();
+          proxyGet('/health', function (err, d) {
+            pubStatus(err ? err.message
+              : '代理正常 ✓（转发目标 ' + (d && d.upstream) + '）', err ? 'bad' : 'good');
+          });
+        });
+
+        $('pubIpBtn').addEventListener('click', function () {
+          pubStatus('正在查…');
+          proxyGet('/ip', function (err, d) {
+            if (err) { pubStatus(err.message, 'bad'); return; }
+            if (d && d.ip) {
+              pubCfg.lastIp = d.ip; savePub();
+              $('pubIp').textContent = d.ip;
+              pubStatus('你的公网出口 IP 是 <b>' + d.ip + '</b>。去公众号后台「设置与开发 › 基本配置 › IP白名单」'
+                + '把它加进去，<b>保存后等 1 分钟</b>再回来测试连接。', 'good');
+            } else pubStatus('没取到 IP：' + ((d && d.error) || '未知'), 'bad');
+          });
+        });
+
+        $('pubIpCopy').addEventListener('click', function () {
+          var ip = $('pubIp').textContent.trim();
+          if (!ip || ip === '未获取') { pubStatus('先点「查 IP」', 'bad'); return; }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(ip).then(function () { pubStatus('已复制 ' + ip, 'good'); })
+              .catch(function () { pubStatus('复制失败，手动选中复制', 'bad'); });
+          } else pubStatus('当前环境不支持一键复制，手动选中复制', 'bad');
+        });
+
+        $('pubEye').addEventListener('click', function () {
+          var el = $('pubSecret');
+          el.type = el.type === 'password' ? 'text' : 'password';
+          this.textContent = el.type === 'password' ? '显示' : '隐藏';
+        });
+
+        $('pubUpload').addEventListener('click', function () {
+          readCfg();
+          if (!pubCfg.appId || !pubCfg.appSecret) { pubStatus('先填 AppID / AppSecret', 'bad'); return; }
+          $('thumbFile').click();
+        });
+
+        $('pubPick').addEventListener('click', function () {
+          readCfg();
+          if (!pubCfg.appId || !pubCfg.appSecret) { pubStatus('先填 AppID / AppSecret', 'bad'); return; }
+          pubStatus('正在取素材列表…');
+          getToken(function (err, token) {
+            if (err) { pubStatus(err.message || err, 'bad'); return; }
+            wxApi('cgi-bin/material/batchget_material', 'access_token=' + encodeURIComponent(token),
+              { type: 'image', offset: 0, count: 20 }, function (e2, d) {
+                if (e2) { pubStatus(e2.message, 'bad'); return; }
+                var bad = wxErrText(d);
+                if (bad) { pubStatus(bad, 'bad'); return; }
+                var items = (d && d.item) || [];
+                if (!items.length) { pubStatus('素材库里还没有图片素材，先点「上传一张」', 'bad'); return; }
+                var html = '<div class="pub-pick">点击选一张当封面：<div class="pub-pick-list">';
+                items.forEach(function (it) {
+                  html += '<div class="pub-pick-item" data-id="' + it.media_id + '" title="' + (it.name || '') + '">'
+                    + '<img src="' + it.url + '"><span>' + (it.name || it.media_id) + '</span></div>';
+                });
+                html += '</div></div>';
+                pubStatus(html, 'good');
+                Array.prototype.forEach.call(pubBody.querySelectorAll('.pub-pick-item'), function (el) {
+                  el.addEventListener('click', function () {
+                    $('pubThumb').value = el.getAttribute('data-id');
+                    pubCfg.thumbMediaId = el.getAttribute('data-id'); savePub();
+                    pubStatus('已选封面 media_id：<code>' + el.getAttribute('data-id') + '</code>', 'good');
+                  });
+                });
+              });
+          });
+        });
+      }
+
+      // access_token 现取现用（7200 秒有效），不落盘 —— 落盘就要处理过期与多页面竞争
+      function getToken(cb) {
+        if (!pubCfg.appId || !pubCfg.appSecret) {
+          cb(new Error('还没填 AppID / AppSecret')); return;
+        }
+        wxApi('cgi-bin/token',
+          'grant_type=client_credential&appid=' + encodeURIComponent(pubCfg.appId)
+          + '&secret=' + encodeURIComponent(pubCfg.appSecret), null, function (err, d) {
+            if (err) { cb(err); return; }
+            if (!d || !d.access_token) { cb(new Error(wxErrText(d) || '没拿到 access_token')); return; }
+            cb(null, d.access_token);
+          });
+      }
+
+      function testConn() {
+        readAllPub();
+        pubStatus('正在取 access_token…');
+        getToken(function (err, token) {
+          if (err) { pubStatus(err.message || String(err), 'bad'); return; }
+          pubStatus('连接正常 ✓ access_token 已拿到（' + token.slice(0, 10) + '…），有效期 2 小时。'
+            + '可以点「发送到草稿箱」了。', 'good');
+        });
+      }
+
+      function readAllPub() {
+        if ($('pubProxy')) {
+          pubCfg.proxy = $('pubProxy').value.trim();
+          pubCfg.appId = $('pubAppId').value.trim();
+          pubCfg.appSecret = $('pubSecret').value;
+          pubCfg.author = $('pubAuthor').value.trim();
+          pubCfg.sourceUrl = $('pubSrcUrl').value.trim();
+          pubCfg.digest = $('pubDigest').value.trim();
+          pubCfg.thumbMediaId = $('pubThumb').value.trim();
+          savePub();
+        }
+      }
+
+      /* 发送草稿
+       *
+       * 草稿接口有两个硬要求，都会在发送前拦住：
+       *   1. thumb_media_id 必填（封面必须是素材库里的永久图片）
+       *   2. 正文里的图片必须是**微信素材库的 URL**。
+       *      占位图是 base64 data URI，微信不认 —— 所以先数一遍，提醒用户替换。 */
+      function sendDraft() {
+        readAllPub();
+        if (!pubCfg.appId || !pubCfg.appSecret) { pubStatus('先填 AppID / AppSecret', 'bad'); return; }
+        if (!pubCfg.thumbMediaId) {
+          pubStatus('还缺封面 media_id —— 草稿接口必填。点「上传一张」或「从素材库选」。', 'bad'); return;
+        }
+        if (!currentHTML) { pubStatus('正文还是空的', 'bad'); return; }
+
+        var ph = GZH.metrics(currentHTML).placeholder || 0;
+        if (ph > 0 && !window.confirm('正文里还有 ' + ph + ' 处占位图（base64）。'
+          + '微信草稿不认 base64 图片，这些图会显示不出来。\n\n确定仍要发送吗？')) {
+          pubStatus('已取消 —— 先在公众号里把占位图换成真图', 'bad'); return;
+        }
+
+        pubStatus('正在取 access_token…');
+        getToken(function (err, token) {
+          if (err) { pubStatus(err.message || String(err), 'bad'); return; }
+
+          // 标题：front-matter / :::masthead 的 title，退一步取首个 # 标题，再退一步取日期
+          var title = pubCfg.title || articleTitle() || ('未命名 ' + new Date().toISOString().slice(0, 10));
+          var author = pubCfg.author || articleAuthor();
+
+          pubStatus('正在提交草稿…');
+          wxApi('cgi-bin/draft/add', 'access_token=' + encodeURIComponent(token), {
+            articles: [{
+              title: title,
+              author: author,
+              digest: pubCfg.digest || '',
+              content: currentHTML,
+              content_source_url: pubCfg.sourceUrl || '',
+              thumb_media_id: pubCfg.thumbMediaId,
+              need_open_comment: 0,
+              only_fans_can_comment: 0
+            }]
+          }, function (e2, d) {
+            if (e2) { pubStatus(e2.message, 'bad'); return; }
+            var bad = wxErrText(d);
+            if (bad) { pubStatus(bad, 'bad'); return; }
+            pubCfg.lastDraftId = d.media_id; savePub();
+            pubStatus('已写入草稿箱 ✓<br>标题：' + escHtml(title) + '<br>media_id：<code>' + d.media_id + '</code>'
+              + '<br><a href="https://mp.weixin.qq.com/" target="_blank">打开公众号后台看草稿</a>', 'good');
+          });
+        });
+      }
+
+      // 从 IR 里找标题/作者：不重新解析一次 Markdown，直接复用上次渲染的 IR
+      function lastIR() { return window.__gzhLastIR || null; }
+      function articleTitle() {
+        var ir = lastIR();
+        if (!ir) return '';
+        for (var i = 0; i < ir.blocks.length; i++) {
+          if (ir.blocks[i].role === 'masthead' && ir.blocks[i].title) return ir.blocks[i].title;
+        }
+        return '';
+      }
+      function articleAuthor() {
+        var ir = lastIR();
+        if (!ir) return '';
+        for (var i = 0; i < ir.blocks.length; i++) {
+          var b = ir.blocks[i];
+          if ((b.role === 'profile' || b.role === 'signature') && (b.author || b.account)) return b.author || b.account;
+        }
+        return '';
+      }
+
+      function closePub() { pubMask.classList.remove('show'); }
+
+      $('pubBtn').addEventListener('click', openPub);
+      $('pubClose').addEventListener('click', closePub);
+      pubMask.addEventListener('click', function (e) { if (e.target === pubMask) closePub(); });
+      $('pubTest').addEventListener('click', testConn);
+      $('pubSend').addEventListener('click', sendDraft);
+      $('pubClear').addEventListener('click', function () {
+        if (!window.confirm('清除本机保存的 AppID / AppSecret？（封面 media_id、代理地址等配置会保留）')) return;
+        pubCfg.appId = ''; pubCfg.appSecret = ''; savePub();
+        if ($('pubAppId')) $('pubAppId').value = '';
+        if ($('pubSecret')) $('pubSecret').value = '';
+        pubStatus('已清除 AppID / AppSecret', 'good');
+      });
+
+      $('thumbFile').addEventListener('change', function (ev) {
+        var file = ev.target.files && ev.target.files[0];
+        ev.target.value = '';
+        if (!file) return;
+        pubStatus('正在上传封面…');
+        getToken(function (err, token) {
+          if (err) { pubStatus(err.message || String(err), 'bad'); return; }
+          var fd = new FormData();
+          fd.append('media', file, file.name);
+          wxApi('cgi-bin/material/add_material',
+            'access_token=' + encodeURIComponent(token) + '&type=image', fd, function (e2, d) {
+              if (e2) { pubStatus(e2.message, 'bad'); return; }
+              var bad = wxErrText(d);
+              if (bad) { pubStatus(bad, 'bad'); return; }
+              pubCfg.thumbMediaId = d.media_id; savePub();
+              if ($('pubThumb')) $('pubThumb').value = d.media_id;
+              pubStatus('封面已上传 ✓ media_id：<code>' + d.media_id + '</code>（' + escHtml(file.name) + '）', 'good');
+            });
+        });
       });
 
       buildModules();
