@@ -99,13 +99,19 @@ async function setRange(page, key, val) {
     await page.selectOption('#themeSel', themeId);
     await page.waitForTimeout(500);
 
-    // ---------- ⑤ 组件模板编辑 ----------
+    // ---------- ⑤ 组件编辑 ----------
     await page.click('#colorBtn');
     await page.waitForTimeout(200);
     await page.click('#colorTabs .tab[data-tab="comp"]');
     await page.waitForTimeout(400);
     check('组件页有组件列表', await page.isVisible('#colorBody .cmp-item'));
-    check('组件页有模板编辑框', await page.isVisible('#cmpTpl'));
+    // 现在默认是「元素」模式（点元素改属性，不出现 HTML 大文本框），
+    // 源码模式要显式切换 —— 这一轮新增的能力，顺手在这里把两条路都验一下。
+    check('组件页默认是元素模式', await page.isVisible('#colorBody .etree .enode'));
+    check('元素模式有属性面板', await page.isVisible('#eprops'));
+    await page.click('#colorBody [data-act="mode"][data-m="src"]');
+    await page.waitForTimeout(350);
+    check('切到源码模式有模板编辑框', await page.isVisible('#cmpTpl'));
 
     const tplBefore = await page.inputValue('#cmpTpl');
     await page.fill('#cmpTpl',

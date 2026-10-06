@@ -27,7 +27,7 @@ const vm = require('vm');
 const ROOT = path.dirname(__dirname);
 global.window = global;
 
-['engine/core.js', 'engine/placeholders.js', 'engine/modules.js',
+['engine/core.js', 'engine/elements.js', 'engine/tplparse.js', 'engine/placeholders.js', 'engine/modules.js',
   'engine/parse.js', 'engine/ir.js', 'engine/sanitize.js', 'engine/render.js',
   'themes/index.js'].forEach((rel) => {
   vm.runInThisContext(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel });

@@ -175,6 +175,7 @@
       tokens: tokens,
       base: theme.base || {},
       components: theme.components || {},
+      compositions: theme.compositions || {},
       inlineStyle: inlineStyle
     };
   }

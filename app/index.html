@@ -460,6 +460,52 @@
       border-radius: 6px; color: #374151; background: #fff;
     }
     .cmp-new em { display: block; font-size: 11px; color: #9ca3af; margin: -4px 0 8px 92px; }
+
+    /* 元素树 + 属性面板：新增用户对Ras**
+     * 元素是属性字典，所以每个样式项都能配一个控件。 */
+    .etree {
+      border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;
+      max-height: 260px; overflow: auto; background: #fafafa;
+      width: 210px; flex-shrink: 0;
+    }
+    .etree .enode {
+      display: flex; align-items: center; gap: 6px; padding: 3px 6px;
+      border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;
+    }
+    .etree .enode:hover { background: #f3f4f6; }
+    .etree .enode.on { background: #eff6ff; color: #1d4ed8; }
+    .etree .ety {
+      font-size: 10px; padding: 1px 5px; border-radius: 4px;
+      background: #e5e7eb; color: #4b5563; flex-shrink: 0; font-weight: 500;
+    }
+    .etree .enode.on .ety { background: #bfdbfe; }
+    .etree .eco { color: #9ca3af; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+    .etree .enode.raw .ety { background: #fde68a; color: #92400e; }
+    .eprops {
+      flex: 1; min-width: 0; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 10px 12px; max-height: 260px; overflow: auto;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .eprops .eph {
+      font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px;
+      padding-bottom: 6px; border-bottom: 1px solid #f3f4f6;
+    }
+    .eprops .eph em { font-style: normal; font-size: 11px; color: #9ca3af; font-weight: 400; }
+    .eprow { display: flex; align-items: center; gap: 6px; }
+    .eprow .epk { width: 92px; font-size: 12px; color: #6b7280; flex-shrink: 0; }
+    .eprow input[type=text], .eprow select {
+      flex: 1; min-width: 0; padding: 4px 6px; font-size: 12px;
+      border: 1px solid #e5e7eb; border-radius: 5px; color: #374151; background: #fff;
+    }
+    .eprow input[type=color] {
+      width: 30px; height: 24px; padding: 0; flex: none;
+      border: 1px solid #e5e7eb; border-radius: 4px; background: none; cursor: pointer;
+    }
+    .eprow input[type=number] { width: 74px; flex: none; padding: 4px 6px; font-size: 12px;
+      border: 1px solid #e5e7eb; border-radius: 5px; color: #374151; }
+    .eprow .unit { font-size: 11px; color: #9ca3af; flex: none; }
+    .eprow.grp { padding-top: 6px; border-top: 1px solid #f3f4f6; }
+    .epempty { color: #9ca3af; font-size: 12px; padding: 8px 0; }
   </style>
 </head>
 
@@ -712,6 +758,8 @@ footer: 文末引导语
 
   <!-- 引擎（顺序有依赖：core 必须最先，placeholders 供 ir 取占位图） -->
   <script src="../engine/core.js"></script>
+  <script src="../engine/elements.js"></script>
+  <script src="../engine/tplparse.js"></script>
   <script src="../engine/placeholders.js"></script>
   <script src="../engine/modules.js"></script>
   <script src="../engine/parse.js"></script>
@@ -926,11 +974,11 @@ footer: 文末引导语
        * ⚠️ base 一定要写回 t.base：render 取值是 Object.assign(tokens, base, block)，
        * base 优先级高于 tokens，写进 tokens 会被原样盖掉 ——
        * 「改了间距没反应」就是这么来的。 */
-      var overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {} };
+      var overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {}, tree: {} };
       var LS_OV = 'gzh.overrides.';
 
       function loadOverrides(id) {
-        overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {} };
+        overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {}, tree: {} };
         var raw = id ? lsGet(LS_OV + id) : null;
         if (raw) { try { overrides = Object.assign(overrides, JSON.parse(raw)); } catch (e) {} }
         syncCustomModules();
@@ -938,10 +986,13 @@ footer: 文末引导语
       function saveOverrides() {
         if (themeSel.value) lsSet(LS_OV + themeSel.value, JSON.stringify(overrides));
       }
+      // 每个分支都带 || {} —— localStorage 里存的可能是老版本的数据
+      // （比如还没有 tree 这个分类），缺一个键就会在这里直接崩掉
       function ovCount() {
-        return Object.keys(overrides.tokens).length + Object.keys(overrides.base).length
-          + Object.keys(overrides.tpl).length + Object.keys(overrides.item).length
-          + Object.keys(overrides.modules).length + Object.keys(overrides.hidden).length;
+        return Object.keys(overrides.tokens || {}).length + Object.keys(overrides.base || {}).length
+          + Object.keys(overrides.tpl || {}).length + Object.keys(overrides.item || {}).length
+          + Object.keys(overrides.modules || {}).length + Object.keys(overrides.hidden || {}).length
+          + Object.keys(overrides.tree || {}).length;
       }
 
       function currentTheme() {
@@ -955,6 +1006,15 @@ footer: 文末引导语
         });
         Object.keys(overrides.item).forEach(function (role) {
           if (t.components && t.components[role]) t.components[role].item = overrides.item[role];
+        });
+        /* 元素树的优先级高于 tpl：render 的 pickComp 先取 compositions。
+         * 所以「在元素面板里改过」之后，旧的 tpl 字符串自动让位，不需要手动清理。
+         * overrides.tree[role] 本身就是 { tree, itemTree } 的形状，直接合进去 ——
+         * 曾写成 { tree: overrides.tree[role] }，多套了一层，树就从数组变成了对象，
+         * 症状是「改了数字预览纹丝不动」。 */
+        Object.keys(overrides.tree).forEach(function (role) {
+          t.compositions = t.compositions || {};
+          t.compositions[role] = Object.assign({}, t.compositions[role], overrides.tree[role]);
         });
         return t;
       }
@@ -1506,8 +1566,9 @@ footer: 文末引导语
         var roles = compRoles();
         if (!cmpSel || roles.indexOf(cmpSel) < 0) cmpSel = roles[0] || null;
 
-        var html = '<p style="margin:0 0 10px;color:#6b7280;">选一个组件直接改它的模板 —— '
-          + '下面即时预览、实时体检，改坏了点「恢复默认」。</p>'
+        var html = '<p style="margin:0 0 10px;color:#6b7280;">选一个组件，左边点它的元素、'
+          + '右边逐项改属性 —— 字号、颜色、圆角、阴影都是一个个字段，不用碰 HTML。'
+          + '下面即时预览，实时体检，改坏了点「恢复默认」。</p>'
           + '<div class="cmp-row" style="margin-bottom:10px;">'
           + '<button class="mini" id="cmpNewBtn">+ 新建组件</button>'
           + '<span style="font-size:11px;color:#9ca3af;">组件＝稿子里 :::xxx 那个盒子长什么样</span>'
@@ -1520,7 +1581,7 @@ footer: 文末引导语
             + '<span class="cn">' + escHtml(roleName(r)) + '</span>'
             + (effectiveModules()[r] ? '<span class="tagx">自建</span>' : '')
             + (overrides.hidden[r] ? '<span class="tagx hide">隐藏</span>' : '')
-            + (overrides.tpl[r] !== undefined ? '<span class="tagx">改过</span>' : '')
+            + ((overrides.tpl[r] !== undefined || overrides.tree[r]) ? '<span class="tagx">改过</span>' : '')
             + '</div>';
         });
 
@@ -1533,13 +1594,202 @@ footer: 文末引导语
         if (cmpSel) checkAndPreview(cmpSel);
       }
 
+      /* ---------- 组件编辑器：元素树 + 属性面板 ----------
+       *
+       * 两个模式，随时可切：
+       *   元素 —— 左边点节点，右边逐项改属性。看不到 HTML，改的是一个个字段。
+       *   源码 —— 直接改 HTML 字符串。元素树做不到的效果（比如手写的一段特殊结构）在这里兜底。
+       *
+       * 为什么还要留源码模式：翻译器有保守规则，译不出来的一律保留为 html 节点。
+       * 没有源码模式的话，那部分就彻底改不了了 —— 那才叫能力倒退。
+       *
+       * 编辑的元素树存在 overrides.tree[role][treeKey]，currentTheme() 会把它
+       * 放进 theme.compositions —— render 的 pickComp 优先取 compositions，
+       * 所以树一旦改过就自动盖住旧的 tpl，不需要显式清理。
+       */
+      var cmpMode = 'tree';      // tree | src
+      var cmpTreeKey = 'tree';   // tree | itemTree
+      var cmpPath = [0];
+
+      // 「当前生效的元素树」：改过 > 主题自带 > 由 tpl 现场翻译
+      // 最后一条让老主题和第三方主题也能立刻元素化编辑，不需要先跑迁移。
+      function baseTreeOf(role, key) {
+        var t = themes[themeSel.value] || {};
+        var c = t.compositions && t.compositions[role];
+        if (c && c[key]) return c[key];
+        var src = key === 'itemTree' ? itemOf(role) : tplOf(role);
+        return src ? window.GZH.tplToTree(src) : [];
+      }
+      function treeOf(role, key) {
+        var mine = overrides.tree[role];
+        if (mine && mine[key]) return mine[key];
+        return baseTreeOf(role, key);
+      }
+      // 可写的树：第一次改动时把基线深拷进 override，之后就地修改
+      function editTree(role, key) {
+        overrides.tree[role] = overrides.tree[role] || {};
+        if (!overrides.tree[role][key]) {
+          overrides.tree[role][key] = JSON.parse(JSON.stringify(baseTreeOf(role, key)));
+        }
+        return overrides.tree[role][key];
+      }
+
+      function nodeSlotOf(tree, path) {
+        var list = tree;
+        for (var i = 0; i < path.length - 1; i++) {
+          if (!list[path[i]]) return null;
+          list = list[path[i]].children = list[path[i]].children || [];
+        }
+        return { list: list, idx: path[path.length - 1] };
+      }
+      function nodeAt(role, key, path) {
+        var s = nodeSlotOf(treeOf(role, key), path);
+        return s ? s.list[s.idx] : null;
+      }
+      function writeNode(role, key, path, fn) {
+        var tree = editTree(role, key);
+        var s = nodeSlotOf(tree, path);
+        if (!s || !s.list[s.idx]) return;
+        fn(s.list[s.idx], s);
+        saveOverrides(); render(); previewComp(role);
+      }
+      function emptyStyle() { return { 'margin': '0', __order: ['margin'], __semi: true }; }
+
+      function samePath(a, b) { return a.join('.') === b.join('.'); }
+
+      function treeNodesHTML(nodes, path) {
+        var h = '';
+        (nodes || []).forEach(function (n, i) {
+          var p = path.concat([i]);
+          var ty = window.GZH.ELEMENT_TYPES[n.type] || { label: n.type };
+          h += '<div class="enode' + (samePath(p, cmpPath) ? ' on' : '')
+            + (n.type === 'html' ? ' raw' : '') + '" data-path="' + p.join('.') + '"'
+            + ' style="padding-left:' + (6 + (p.length - 1) * 11) + 'px;">'
+            + '<span class="ety">' + escHtml(ty.label) + '</span>'
+            + '<span class="eco">' + escHtml(window.GZH.nodeSummary(n)) + '</span></div>'
+            + treeNodesHTML(n.children, p);
+        });
+        return h;
+      }
+
+      /* 一个样式项配一个控件。控件类型由 CSS 属性名查表决定 ——
+       * 查不到就给纯文本框，所以「没登记过的 CSS 属性」照样能改，只是没有专用控件。 */
+      function styleRowHTML(key, val) {
+        var E = window.GZH;
+        var meta = E.propMeta(key);
+        var h = '<div class="eprow"><span class="epk" title="' + escHtml(key) + '">'
+          + escHtml(meta.label) + '</span>';
+        var s = String(val == null ? '' : val);
+        var opts = E.CSS_ENUMS[key];
+
+        if (meta.ctrl === 'color') {
+          h += '<input type="color" class="ep-color" data-k="' + escHtml(key) + '" value="'
+            + (/^#[0-9a-fA-F]{6}$/.test(s) ? s : '#888888') + '">'
+            + '<input type="text" class="ep-st" data-k="' + escHtml(key) + '" value="'
+            + escHtml(s) + '" spellcheck="false">';
+        } else if (opts && s.indexOf('{{') < 0) {
+          h += '<select class="ep-st" data-k="' + escHtml(key) + '">'
+            + opts.map(function (o) {
+              return '<option value="' + escHtml(o) + '"' + (o === s ? ' selected' : '') + '>' + o + '</option>';
+            }).join('')
+            + '<option value=""' + (opts.indexOf(s) < 0 ? ' selected' : '') + '>自定义（在下面手填）</option></select>'
+            + '<input type="text" class="ep-st" data-k="' + escHtml(key) + '" value="'
+            + escHtml(s) + '" spellcheck="false" style="max-width:130px;">';
+        } else if (/^-?[\d.]+(px|%|em|rem)?$/.test(s)) {
+          // 纯数值才给数字框；「0 0 12px」这类复合值退回文本框，免得改坏
+          var num = parseFloat(s) || 0;
+          var unit = String(s).replace(/^-?[\d.]+/, '') || 'px';
+          h += '<input type="number" class="ep-px" data-k="' + escHtml(key) + '" data-u="' + escHtml(unit)
+            + '" value="' + num + '" step="1"><span class="unit">' + escHtml(unit) + '</span>';
+        } else {
+          h += '<input type="text" class="ep-st" data-k="' + escHtml(key) + '" value="'
+            + escHtml(s) + '" spellcheck="false">';
+        }
+        h += '<button class="mini ep-delst" data-k="' + escHtml(key) + '" title="删除这一项">×</button>';
+        return h + '</div>';
+      }
+
+      var STYLE_PRESET = ['font-size', 'color', 'background', 'padding', 'margin', 'margin-top',
+        'border', 'border-radius', 'line-height', 'letter-spacing', 'text-align', 'font-weight',
+        'box-shadow', 'width', 'height', 'gap', 'display'];
+
+      function propsHTML(node) {
+        var E = window.GZH;
+        if (!node) return '<div class="epempty">在左边的树里点一个元素。</div>';
+        var ty = E.ELEMENT_TYPES[node.type] || { label: node.type, desc: '' };
+        var h = '<div class="eph">' + escHtml(ty.label) + '<em>' + escHtml(ty.desc || '') + '</em></div>';
+
+        if (node.type === 'html') {
+          return h + '<div class="epempty">这一块结构太不规则，没能拆成元素，'
+            + '保持在「源码」模式里改它。</div>'
+            + '<div class="eprow"><button class="mini" data-eact="delnode">删除这个块</button></div>';
+        }
+
+        h += '<div class="eprow"><span class="epk">类型</span><select class="ep-type">'
+          + Object.keys(E.ELEMENT_TYPES).map(function (k) {
+            return '<option value="' + k + '"' + (k === node.type ? ' selected' : '') + '>'
+              + escHtml(E.ELEMENT_TYPES[k].label) + '</option>';
+          }).join('') + '</select></div>';
+
+        ['text', 'badge', 'chip', 'slot'].forEach(function (tt) {
+          if (node.type !== tt) return;
+          var f = tt === 'slot' ? 'name' : 'text';
+          h += '<div class="eprow"><span class="epk">' + (tt === 'slot' ? '槽位名' : '文字内容')
+            + '</span><input type="text" class="ep-field" data-f="' + f + '" value="'
+            + escHtml(node[f] == null ? '' : node[f]) + '" spellcheck="false"></div>';
+        });
+        if (node.type === 'image') {
+          h += '<div class="eprow"><span class="epk">图片地址</span><input type="text" class="ep-field"'
+            + ' data-f="src" value="' + escHtml(node.src == null ? '' : node.src) + '" spellcheck="false"></div>';
+        }
+
+        h += '<div class="eprow"><span class="epk">显示条件</span><input type="text" class="ep-field"'
+          + ' data-f="if" value="'
+          + escHtml(Array.isArray(node.if) ? node.if.join(',') : (node.if || ''))
+          + '" placeholder="留空=总是显示，如 cover" spellcheck="false"></div>';
+
+        var st = node.style || {};
+        var keys = (st.__order || Object.keys(st)).filter(function (k) {
+          return k.indexOf('__') !== 0 && Object.prototype.hasOwnProperty.call(st, k);
+        });
+        h += '<div class="eprow grp"><span class="epk">样式</span><em style="font-size:11px;color:#9ca3af;">'
+          + keys.length + ' 项</em></div>';
+        keys.forEach(function (k) { h += styleRowHTML(k, st[k]); });
+
+        h += '<div class="eprow grp"><span class="epk">加一项样式</span><select class="ep-newkey">'
+          + STYLE_PRESET.map(function (k) {
+            return '<option value="' + k + '">' + escHtml(E.propMeta(k).label) + '（' + k + '）</option>';
+          }).join('') + '</select>'
+          + '<button class="mini" data-eact="addstyle">加</button></div>';
+
+        if (ty.withChildren) {
+          h += '<div class="eprow grp"><span class="epk">子元素</span><select class="ep-newtype">'
+            + Object.keys(E.ELEMENT_TYPES).map(function (k) {
+              return '<option value="' + k + '">' + escHtml(E.ELEMENT_TYPES[k].label) + '</option>';
+            }).join('') + '</select>'
+            + '<button class="mini" data-eact="addchild">添加</button></div>';
+        }
+        h += '<div class="eprow grp"><span class="epk"></span>'
+          + '<button class="mini" data-eact="delnode" style="color:#991b1b;">删除这个元素</button></div>';
+        return h;
+      }
+
+      function srcEditorHTML(role, item, hasItem) {
+        return '<textarea class="cmp-tpl" id="cmpTpl" spellcheck="false">' + escHtml(tplOf(role)) + '</textarea>'
+          + (hasItem
+            ? '<div class="cmp-row"><label>列表项模板（每个 - 条目渲染成什么）</label></div>'
+            + '<textarea class="cmp-tpl" id="cmpItem" spellcheck="false" style="min-height:86px;">'
+            + escHtml(item) + '</textarea>' : '');
+      }
+
       function cmpEditorHTML(role) {
         var item = itemOf(role);
         var srcComp = (themes[themeSel.value] || {}).components || {};
         var m = window.GZH.MODULES && window.GZH.MODULES[role];
         var hasItem = !!(item || (srcComp[role] && srcComp[role].item) || (m && m.fallback && m.fallback.item));
+        if (!hasItem && cmpTreeKey === 'itemTree') cmpTreeKey = 'tree';
 
-        return '<h4>' + escHtml(roleName(role)) + '<em>:::' + role + '</em>'
+        var h = '<h4>' + escHtml(roleName(role)) + '<em>:::' + role + '</em>'
           + '<span style="flex:1"></span>'
           + '<button class="mini" data-act="hide" data-role="' + role + '">'
           + (overrides.hidden[role] ? '取消隐藏' : '隐藏') + '</button>'
@@ -1547,25 +1797,49 @@ footer: 文末引导语
           + (effectiveModules()[role]
             ? '<button class="mini" data-act="del" data-role="' + role + '">删除组件</button>' : '')
           + '</h4>'
-          + '<textarea class="cmp-tpl" id="cmpTpl" spellcheck="false">' + escHtml(tplOf(role)) + '</textarea>'
-          + (hasItem
-            ? '<div class="cmp-row"><label>列表项模板（每个 - 条目渲染成什么）</label></div>'
-            + '<textarea class="cmp-tpl" id="cmpItem" spellcheck="false" style="min-height:86px;">'
-            + escHtml(item) + '</textarea>' : '')
-          + '<div class="cmp-msg" id="cmpMsg"></div>'
+          + '<div class="cmp-row" style="margin-bottom:8px;">'
+          + '<button class="mini" data-act="mode" data-m="tree"'
+          + (cmpMode === 'tree' ? ' style="border-color:#2563eb;color:#1d4ed8;"' : '') + '>元素</button>'
+          + '<button class="mini" data-act="mode" data-m="src"'
+          + (cmpMode === 'src' ? ' style="border-color:#2563eb;color:#1d4ed8;"' : '') + '>源码</button>'
+          + '<span style="font-size:11px;color:#9ca3af;">'
+          + (cmpMode === 'tree' ? '点元素改属性，不用碰 HTML'
+            : '直接改 HTML —— 元素模式做不到的效果在这里改') + '</span></div>';
+
+        if (cmpMode === 'tree') {
+          h += '<div class="cmp-row" style="margin-bottom:8px;"><label>编辑</label>'
+            + '<select id="tkSel">'
+            + '<option value="tree"' + (cmpTreeKey === 'tree' ? ' selected' : '') + '>组件的主体</option>'
+            + (hasItem ? '<option value="itemTree"' + (cmpTreeKey === 'itemTree' ? ' selected' : '')
+              + '>列表项（每条 - 项目）</option>' : '')
+            + '</select></div>'
+            + '<div class="cmp-wrap"><div class="etree">' + treeNodesHTML(treeOf(role, cmpTreeKey), []) + '</div>'
+            + '<div class="eprops" id="eprops">' + propsHTML(nodeAt(role, cmpTreeKey, cmpPath)) + '</div></div>';
+        } else {
+          h += srcEditorHTML(role, item, hasItem);
+        }
+
+        return h + '<div class="cmp-msg" id="cmpMsg"></div>'
           + '<div class="cmp-row"><label>预览 · 按这个组件的样例内容渲染</label></div>'
           + '<div class="cmp-prev" id="cmpPrev"></div>';
       }
 
       function bindComp() {
         Array.prototype.forEach.call(colorBody.querySelectorAll('.cmp-item'), function (el) {
-          el.addEventListener('click', function () { cmpSel = el.getAttribute('data-role'); tabComp(); });
+          el.addEventListener('click', function () {
+            cmpSel = el.getAttribute('data-role'); cmpPath = [0]; tabComp();
+          });
         });
 
         Array.prototype.forEach.call(colorBody.querySelectorAll('[data-act]'), function (b) {
           b.addEventListener('click', function (ev) {
             ev.stopPropagation();
             var act = b.getAttribute('data-act'), role = b.getAttribute('data-role');
+
+            if (act === 'mode') {
+              cmpMode = b.getAttribute('data-m') || 'tree';
+              cmpPath = [0]; tabComp(); return;
+            }
 
             if (act === 'hide') {
               if (overrides.hidden[role]) delete overrides.hidden[role];
@@ -1574,7 +1848,8 @@ footer: 文末引导语
               toast(overrides.hidden[role] ? '已从左栏隐藏，稿子里写了照样渲染' : '已恢复显示');
             } else if (act === 'reset') {
               delete overrides.tpl[role]; delete overrides.item[role];
-              saveOverrides(); render(); tabComp(); toast('已恢复默认模板');
+              delete overrides.tree[role];
+              saveOverrides(); render(); tabComp(); toast('已恢复默认模板（元素改动一并清除）');
             } else if (act === 'del') {
               if (!window.confirm('删除自建组件「' + roleName(role) + '」？\n'
                 + '稿子里的 :::' + role + ' 会降级成普通段落。')) return;
@@ -1590,9 +1865,125 @@ footer: 文末引导语
           });
         });
 
+        /* ---------- 元素树的交互 ---------- */
+        Array.prototype.forEach.call(colorBody.querySelectorAll('.etree .enode'), function (el) {
+          el.addEventListener('click', function () {
+            cmpPath = (el.getAttribute('data-path') || '0').split('.').map(Number);
+            tabComp();
+          });
+        });
+        var tk = $('tkSel');
+        if (tk) tk.addEventListener('change', function () {
+          cmpTreeKey = tk.value; cmpPath = [0]; tabComp();
+        });
+
+        var props = $('eprops');
+        if (props) {
+          // 样式值：改完立即写树 + 重渲染全文预览（不重绘面板，否则输入框会掉焦点）
+          props.addEventListener('input', function (e) {
+            var el = e.target, k = el.getAttribute('data-k');
+            if (k == null) return;
+            var val = el.value;
+            if (el.classList.contains('ep-px')) val = val + (el.getAttribute('data-u') || 'px');
+            writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+              n.style = n.style || {};
+              n.style[k] = val;
+              if (!n.style.__order) n.style.__order = Object.keys(n.style).filter(function (x) { return x.indexOf('__') !== 0; });
+              if (n.style.__order.indexOf(k) < 0) n.style.__order.push(k);
+            });
+          });
+          props.addEventListener('change', function (e) {
+            var el = e.target, k = el.getAttribute('data-k');
+            if (k == null) return;
+            if (el.classList.contains('ep-color')) return;    // color 已在 input 里处理过
+            writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+              n.style = n.style || {};
+              n.style[k] = el.value;
+              if (!n.style.__order) n.style.__order = Object.keys(n.style).filter(function (x) { return x.indexOf('__') !== 0; });
+              if (n.style.__order.indexOf(k) < 0) n.style.__order.push(k);
+            });
+          });
+
+          Array.prototype.forEach.call(props.querySelectorAll('.ep-field'), function (el) {
+            el.addEventListener('change', function () {
+              var f = el.getAttribute('data-f'), v = el.value;
+              writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+                if (f === 'if') {
+                  var arr = v.split(/[,，\s]+/).filter(Boolean);
+                  if (!arr.length) delete n.if;
+                  else n.if = arr.length === 1 ? arr[0] : arr;
+                } else {
+                  n[f] = v;
+                }
+              });
+              tabComp();
+            });
+          });
+          var typeSel = props.querySelector('.ep-type');
+          if (typeSel) typeSel.addEventListener('change', function () {
+            writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) { n.type = typeSel.value; });
+            tabComp();
+          });
+
+          // 注意：这里必须用 data-eact 而不是 data-act。
+          // bindComp 给所有 [data-act] 都绑了处理器并调用了 stopPropagation()，
+          // 面板里的按钮若也用 data-act，事件冒泡不到这里 —— 症状是「按钮点了没反应」。
+          props.addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-eact], button.ep-delst');
+            if (!b) return;
+            var act = b.getAttribute('data-eact');
+
+            if (b.classList.contains('ep-delst')) {
+              var k2 = b.getAttribute('data-k');
+              writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+                if (!n.style) return;
+                delete n.style[k2];
+                var o = n.style.__order || [];
+                var j = o.indexOf(k2); if (j >= 0) o.splice(j, 1);
+              });
+              tabComp(); return;
+            }
+            if (act === 'addstyle') {
+              var nk = props.querySelector('.ep-newkey');
+              if (!nk) return;
+              writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+                n.style = n.style || {};
+                if (n.style[nk.value] !== undefined) return;
+                n.style[nk.value] = '';
+                if (!n.style.__order) n.style.__order = Object.keys(n.style).filter(function (x) { return x.indexOf('__') !== 0; });
+                n.style.__order.push(nk.value);
+              });
+              tabComp(); return;
+            }
+            if (act === 'addchild') {
+              var nt = props.querySelector('.ep-newtype');
+              if (!nt) return;
+              writeNode(cmpSel, cmpTreeKey, cmpPath, function (n) {
+                n.children = n.children || [];
+                var kid = { type: nt.value };
+                if (kid.type === 'text') { kid.text = '新文字'; kid.style = emptyStyle(); }
+                else if (kid.type === 'image') { kid.src = '{{src}}'; kid.style = emptyStyle(); }
+                else if (kid.type === 'slot') kid.name = 'content';
+                else if (kid.type === 'html') kid.html = '';
+                else kid.style = emptyStyle();
+                n.children.push(kid);
+              });
+              tabComp(); return;
+            }
+            if (act === 'delnode') {
+              writeNode(cmpSel, cmpTreeKey, cmpPath, function (n, slot) {
+                slot.list.splice(slot.idx, 1);
+              });
+              cmpPath = [0]; tabComp(); return;
+            }
+          });
+        }
+
         var ta = $('cmpTpl');
         if (ta) ta.addEventListener('input', function () {
-          overrides.tpl[cmpSel] = ta.value; saveOverrides();
+          overrides.tpl[cmpSel] = ta.value;
+          delete overrides.tree[cmpSel];      // 源码改了就让元素树失效，否则「改了没反应」
+          saveOverrides();
           checkAndPreview(cmpSel); render();
         });
         var ti = $('cmpItem');
@@ -1654,8 +2045,11 @@ footer: 文末引导语
         var t = themes[themeSel.value] || {};
         var srcComp = (t.components && t.components[from]) || null;
         overrides.modules[role] = { name: name || role, group: '正文', kind: kind, from: from };
-        // 把起点的模板抄一份过来，否则新组件只能继承内置兜底，看起来和起点不像
-        if (srcComp && srcComp.tpl) overrides.tpl[role] = srcComp.tpl;
+        // 起点的样子要抄过来 —— 有元素树就抄树（新组件立刻可逐项编辑），
+        // 没有就退回抄 HTML 字符串；两者 render 都会认。
+        var srcTree = t.compositions && t.compositions[from] && t.compositions[from].tree;
+        if (srcTree) overrides.tree[role] = { tree: srcTree };
+        else if (srcComp && srcComp.tpl) overrides.tpl[role] = srcComp.tpl;
         if (srcComp && srcComp.item) overrides.item[role] = srcComp.item;
 
         saveOverrides(); syncCustomModules(); buildModules();
@@ -1681,8 +2075,12 @@ footer: 文末引导语
         WECHAT_BAN.forEach(function (p) {
           if (s.indexOf(p[0]) >= 0) bad.push(p[1]);
         });
-        if (/\{\{/.test(s)) {
-          bad.push('还有没被替换的 <code>{{…}}</code> —— 变量名叫错了会原样出现在正文里');
+        // 模板里出现 {{title}} 是正常的，本就不该报警；
+        // 真正要拦的是**括号写残了**（{{title} / {{?x}）——那种 fill() 匹配不上，
+        // 会原样印到正文里。所以这条查的是「单个右括号」而不是「有没有 {{」。
+        if (/\{\{\/?\w+\}(?!\})/.test(s)) {
+          bad.push('模板括号写残了（形如 <code>{{title}</code>）—— 少一个右括号，'
+            + '变量就不会被替换，会原样出现在正文里');
         }
         var grad = (s.match(/135deg/g) || []).length;
         if (grad) warn.push(grad + ' 处 135° 渐变 —— 微信深色模式下卡片里的字可能变淡');
@@ -1705,10 +2103,19 @@ footer: 文末引导语
         return html;
       }
 
+      /* 两种体检都要给用户看，缺一不可：
+       *   模板红线 —— 编辑当下就能发现（<div>、class、裸文字）
+       *   渲染结果 —— 语法没错但产物踩线的情况（比如最后一个 leaf span 被删光了）
+       * 曾经写成后者覆盖前者，结果「写了 <div> 却不报警」。 */
       function checkAndPreview(role) {
-        var el = $('cmpMsg');
-        if (el) el.innerHTML = checkTpl(($('cmpTpl') && $('cmpTpl').value) || '');
         previewComp(role);
+        var box = $('cmpMsg');
+        if (!box) return;
+        var src = cmpMode === 'src'
+          ? (($('cmpTpl') && $('cmpTpl').value) || '')
+          : window.GZH.treeTpl(treeOf(role, cmpTreeKey));
+        var tplMsg = src ? checkTpl(src) : '';
+        if (tplMsg) box.innerHTML = tplMsg + box.innerHTML;
       }
 
       /* 用一个样例 block 渲染这一个组件 —— 比看 HTML 直观得多。
@@ -1716,14 +2123,18 @@ footer: 文末引导语
       function previewComp(role) {
         var el = $('cmpPrev');
         if (!el) return;
-        var tpl = ($('cmpTpl') && $('cmpTpl').value) || '';
-        var it = $('cmpItem') ? $('cmpItem').value : '';
 
         var t = JSON.parse(JSON.stringify(currentTheme() || themes[themeSel.value]));
-        t.components = t.components || {};
-        t.components[role] = t.components[role] || {};
-        t.components[role].tpl = tpl;
-        if (it) t.components[role].item = it;
+
+        if (cmpMode === 'src') {
+          // 源码模式下必须把元素树移走，否则 pickComp 会优先取 compositions，
+          // 表现就是「我明明改了源码，预览纹丝不动」。
+          if (t.compositions) delete t.compositions[role];
+          t.components = t.components || {};
+          t.components[role] = t.components[role] || {};
+          t.components[role].tpl = ($('cmpTpl') && $('cmpTpl').value) || '';
+          if ($('cmpItem')) t.components[role].item = $('cmpItem').value;
+        }
 
         var m = window.GZH.MODULES && window.GZH.MODULES[role];
         var md = (m && m.ui && m.ui.snippet) || '';
@@ -1739,9 +2150,24 @@ footer: 文末引导语
             return;
           }
           el.innerHTML = window.GZH.renderBlock(t, blk);
+          checkCompHealth(el.innerHTML, t);
         } catch (e) {
           el.innerHTML = '<div class="cmp-prev-empty" style="color:#991b1b;">预览失败：'
             + escHtml(e.message) + '</div>';
+        }
+      }
+
+      /* 光查模板字符串不够 —— 真正常见的问题是「语法没错，但渲染出来踩了红线」。
+       * 所以渲染完再对结果跑一遍体检规则（theme.rules），这才是口径一致的判官。 */
+      function checkCompHealth(html, theme) {
+        var box = $('cmpMsg');
+        if (!box) return;
+        var v = window.GZH.verdict(window.GZH.metrics(html), (theme && theme.rules) || {});
+        if (v.ok) {
+          box.innerHTML = '<span style="color:#065f46;">✓ 渲染结果没踩红线</span>';
+        } else {
+          box.innerHTML = '<b style="color:#92400e;">渲染结果：</b><ul>'
+            + v.issues.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
         }
       }
 
@@ -1757,7 +2183,10 @@ footer: 文末引导语
       // 「重置本页」只清当前页签那一类改动 —— 改坏了色没必要把建好的组件一起赔进去
       function resetColor() {
         if (curTab === 'scale') overrides.base = {};
-        else if (curTab === 'comp') { overrides.tpl = {}; overrides.item = {}; overrides.modules = {}; overrides.hidden = {}; }
+        else if (curTab === 'comp') {
+          overrides.tpl = {}; overrides.item = {}; overrides.modules = {};
+          overrides.hidden = {}; overrides.tree = {};
+        }
         else overrides.tokens = {};
         saveOverrides(); syncCustomModules(); buildModules(); render();
         openColor(curTab);
@@ -1818,7 +2247,7 @@ footer: 文末引导语
 
         buildThemeOptions();
         themeSel.value = id;
-        overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {} };  // 改动已固化进新主题
+        overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {}, tree: {} };  // 改动已固化进新主题
         saveOverrides(); syncCustomModules(); buildModules();
         render();
 

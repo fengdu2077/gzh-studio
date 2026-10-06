@@ -19,6 +19,8 @@ global.window = global;
 
 [
   'engine/core.js',
+  'engine/elements.js',
+  'engine/tplparse.js',
   'engine/placeholders.js',
   'engine/modules.js',
   'engine/parse.js',

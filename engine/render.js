@@ -36,6 +36,42 @@
 
   // 组件没声明 source 时，看 block 上哪个字段是数组。
   // 注意这里判断的是「数据形态」而不是「role 叫什么」，所以加新模块不用改这里。
+  /* 取一个组件的「模板源」
+   *
+   * 优先取元素树（theme.compositions[role].tree），没有才退回 HTML 字符串
+   * （components[role].tpl / FALLBACK）。两条路最终都收敛成**同一个模板字符串**，
+   * 因为元素树的渲染产物就是模板串 —— 见 tplparse 的忠实度校验，
+   * 已证明两者逐字节一致（check/build_compositions.js 会强制校验）。
+   *
+   * 这样做的理由是「同一个能力对老主题也生效」：
+   * 导入一个 2026-10 之前的主题（没有 compositions），引擎照旧渲染，字节不变。
+   *
+   * KEY_MAP 把旧字段名映射到元素树字段名 —— 提取원的共同任务是取源，不是为了写成安徽。
+   */
+  var KEY_MAP = {
+    tpl: 'tree',
+    item: 'itemTree',
+    itemOrdered: 'itemOrderedTree',
+    subitem: 'subitemTree'
+  };
+
+  function pickComp(theme, role) {
+    var compo = theme.compositions && theme.compositions[role];
+    var legacy = (theme.components && theme.components[role]) || GZH.FALLBACK[role];
+    var out = {};
+
+    Object.keys(KEY_MAP).forEach(function (k) {
+      if (compo && compo[KEY_MAP[k]]) out[k] = GZH.treeTpl(compo[KEY_MAP[k]]);
+      else if (legacy && legacy[k]) out[k] = legacy[k];
+    });
+
+    out.source = (compo && compo.source) || (legacy && legacy.source);
+    out.__fromTree = !!(compo && compo.tree);
+    return out;
+  }
+
+  // 组件没声明 source 时，看 block 上哪个字段是数组。
+  // 注意这里判断的是「数据形态」而不是「role 叫什么」，所以加新模块不用改这里。
   function pickItemSource(block) {
     if (Array.isArray(block.columns)) return 'columns';
     return 'items';
@@ -81,8 +117,8 @@
   function renderBlock(rawTheme, block) {
     // 主题先过一遍派生与引用展开，后面拿到的 token 都是可直接用的字面量
     var theme = prepared(rawTheme);
-    var comp = (theme.components && theme.components[block.role]) || GZH.FALLBACK[block.role];
-    if (!comp) return '';
+    var comp = pickComp(theme, block.role);
+    if (!comp.tpl && !comp.item) return '';
 
     var v = buildVars(theme, block);
 
