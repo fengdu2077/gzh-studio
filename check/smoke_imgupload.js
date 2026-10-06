@@ -19,7 +19,7 @@ const { chromium } = require('playwright-core');
 
 const ROOT = path.dirname(__dirname);
 const APP = 'file:///' + path.join(ROOT, 'app', 'index.html').replace(/\\/g, '/');
-const PORT = 8911;
+const PORT = 8913;
 const PROXY = 'http://127.0.0.1:' + PORT;
 
 // 1×1 透明 PNG，够小，只为验证 multipart 链路

@@ -111,7 +111,10 @@
            * 以前 label 恒为写死的 'PROMPT · 原话'，作者想写自己的出处也改不了；
            * 现在写了 @ 就用作者的，没写仍退回原默认值（老稿输出不变）。 */
           var qt = unesc(b.text || '');
-          var qlabel = 'PROMPT · 原话';
+          // 默认出处以前写死在引擎里，想改只能改代码。
+          // 现在稿子开头写一行 `quoteLabel: xxx` 就能改；没写就还是老样子。
+          var qlabel = (typeof meta.quoteLabel === 'string' && meta.quoteLabel.trim())
+            ? meta.quoteLabel.trim() : 'PROMPT · 原话';
           var qm = /(?:^|\n)[ \t]*@([^\n]+)[ \t]*$/.exec(qt);
           if (qm) {
             qlabel = qm[1].trim();

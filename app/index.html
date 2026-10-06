@@ -395,6 +395,71 @@
       display: block; font-size: 10px; padding: 3px 4px; color: #6b7280;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+
+    /* ---------- 主题编辑：三个页签 ---------- */
+    .tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid #e5e7eb; }
+    .tab {
+      padding: 8px 14px; font-size: 13px; border: 0; background: transparent;
+      color: #6b7280; border-bottom: 2px solid transparent; cursor: pointer;
+    }
+    .tab:hover { color: #111827; }
+    .tab.on { color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
+
+    /* 组件编辑器：左列组件列表 + 右列模板编辑区 */
+    .cmp-wrap { display: flex; gap: 12px; min-height: 430px; }
+    .cmp-list {
+      width: 190px; flex-shrink: 0; overflow-y: auto; max-height: 470px;
+      border-right: 1px solid #e5e7eb; padding-right: 8px;
+    }
+    .cmp-item {
+      padding: 6px 8px; font-size: 12px; border-radius: 6px; cursor: pointer;
+      border: 1px solid transparent; display: flex; align-items: center; gap: 4px;
+    }
+    .cmp-item:hover { background: #f3f4f6; }
+    .cmp-item.on { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .cmp-item .cn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cmp-item .tagx {
+      font-size: 9px; padding: 1px 4px; border-radius: 4px; flex-shrink: 0;
+      background: #eef2ff; color: #4338ca;
+    }
+    .cmp-item .tagx.hide { background: #f3f4f6; color: #9ca3af; }
+    .cmp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+    .cmp-main h4 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .cmp-main h4 em { font-style: normal; font-size: 11px; color: #9ca3af; font-weight: 400; }
+    .cmp-tpl {
+      width: 100%; box-sizing: border-box; min-height: 190px; resize: vertical;
+      font-family: Menlo, Consolas, monospace; font-size: 11px; line-height: 1.6;
+      padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; color: #374151;
+    }
+    .cmp-tpl:focus { outline: 0; border-color: #2563eb; }
+    .cmp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .cmp-row label { font-size: 12px; color: #6b7280; }
+    .cmp-row input[type=text] {
+      padding: 4px 8px; font-size: 12px; border: 1px solid #e5e7eb;
+      border-radius: 6px; color: #374151;
+    }
+    .cmp-msg { font-size: 12px; line-height: 1.7; }
+    .cmp-msg.bad { color: #991b1b; }
+    .cmp-msg.warn { color: #92400e; }
+    .cmp-msg.good { color: #065f46; }
+    .cmp-msg ul { margin: 4px 0 0; padding-left: 18px; }
+    .cmp-prev {
+      border: 1px dashed #d1d5db; border-radius: 8px; padding: 10px;
+      background: #fff; max-height: 260px; overflow: auto;
+    }
+    .cmp-prev-empty { color: #9ca3af; font-size: 12px; }
+    .cmp-new {
+      border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px;
+      background: #f9fafb; display: none;
+    }
+    .cmp-new.show { display: block; }
+    .cmp-new .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .cmp-new .row span { width: 84px; font-size: 12px; color: #6b7280; flex-shrink: 0; }
+    .cmp-new input[type=text], .cmp-new select {
+      flex: 1; padding: 5px 8px; font-size: 12px; border: 1px solid #e5e7eb;
+      border-radius: 6px; color: #374151; background: #fff;
+    }
+    .cmp-new em { display: block; font-size: 11px; color: #9ca3af; margin: -4px 0 8px 92px; }
   </style>
 </head>
 
@@ -403,7 +468,7 @@
     <div class="brand">公众号排版<span>本地渲染 · 零成本 · 干净复制</span></div>
     <div class="spacer"></div>
     <select id="themeSel" title="选择主题"></select>
-    <button id="colorBtn">配色</button>
+    <button id="colorBtn">主题编辑</button>
     <button id="aiBtn">AI 用法</button>
     <button id="pubBtn">发布到草稿箱</button>
     <button id="sampleBtn">载入示例</button>
@@ -452,15 +517,21 @@
     </div>
   </div>
 
+  <!-- 主题编辑：配色 / 尺度 / 组件 三个页签共用一个弹层 -->
   <div class="mask" id="colorMask">
-    <div class="modal">
-      <h3>配色 · 改完即时预览<button id="colorClose" class="xbtn" title="关闭">×</button></h3>
+    <div class="modal" style="width:min(900px,94vw);">
+      <h3>主题编辑 · 配色 / 尺度 / 组件<button id="colorClose" class="xbtn" title="关闭">×</button></h3>
+      <div class="tabs" id="colorTabs">
+        <button class="tab" data-tab="color">配色</button>
+        <button class="tab" data-tab="scale">尺度</button>
+        <button class="tab" data-tab="comp">组件</button>
+      </div>
       <div class="body" id="colorBody"></div>
       <div class="foot">
-        <span class="hint" style="padding:0;">只改主色系 —— 阴影、链接、加粗、渐变端点会自动跟着变</span>
+        <span class="hint" style="padding:0;">改动只存在本机，点「导出主题文件」才会固化成一套新主题</span>
         <div class="spacer"></div>
         <button id="colorImport">导入主题</button>
-        <button id="colorReset">重置</button>
+        <button id="colorReset">重置本页</button>
         <button id="colorExport" class="primary">导出主题文件</button>
       </div>
     </div>
@@ -693,12 +764,14 @@ footer: 文末引导语
       function moduleEntries() {
         var flat = [];
 
-        // 正式模块：ui 可以是单个对象，也可以是数组（同一 role 多个入口）
+        // 正式模块：ui 可以是单个对象，也可以是数组（同一 role 多个入口）。
+        // 面板里「隐藏」的组件在这里被除名 —— 只是不给你看，模板还在。
         Object.keys(GZH.MODULES || {}).forEach(function (role) {
+          if (overrides && overrides.hidden && overrides.hidden[role]) return;
           var ui = GZH.MODULES[role].ui;
           if (!ui) return;                       // signature 这类自动生成的没有入口
           (Array.isArray(ui) ? ui : [ui]).forEach(function (u) {
-            flat.push(Object.assign({}, u));
+            flat.push(Object.assign({}, u, { role: role }));
           });
         });
 
@@ -706,7 +779,8 @@ footer: 文末引导语
           return {
             n: u.label, s: u.snippet, c: u.hint || '',
             group: u.group || '正文',
-            once: !!u.once
+            once: !!u.once,
+            role: u.role || ''
           };
         });
       }
@@ -715,6 +789,7 @@ footer: 文末引导语
 
       function buildModules() {
         var box = $('modules');
+        box.innerHTML = '';      // 会被反复调用（隐藏组件、新建组件），不清会越叠越多
         var entries = moduleEntries();
 
         GROUPS.forEach(function (g) {
@@ -731,6 +806,7 @@ footer: 文末引导语
             b.className = 'mod' + (it.once ? ' once' : '');
             b.innerHTML = '<b>' + it.n + '</b><code>' + escHtml(it.c) + '</code>';
             b.title = it.once ? '全文只允许一个' : '';
+            if (it.role) b.setAttribute('data-role', it.role);   // 隐藏 / 删除时要能精确定位
             b.addEventListener('click', function () { insert(it); });
             box.appendChild(b);
           });
@@ -835,19 +911,228 @@ footer: 文末引导语
         if (prev && themes[prev]) themeSel.value = prev;
       }
 
-      /* 用户在配色面板里改过的值，单独存而不是写回原主题对象。
-       * 这样「切换主题」「重置」都只是动这一小块，原主题始终干净。 */
-      var overrides = {};
+      /* ---------- 改动层（overrides） ----------
+       *
+       * 面板里的所有改动先落在这里，不直接改原主题 —— 这样「切换主题」「重置」
+       * 只是动这一小块，原主题始终干净；改坏了也能一键回到出厂。
+       *
+       * 四类改动必须**分开存**，因为它们最终落进主题的位置不同：
+       *   tokens  → theme.tokens            颜色
+       *   base    → theme.base              尺度（字号 / 行距 / 间距 / 对齐）
+       *   tpl     → theme.components[x].tpl 某个组件的模板 HTML
+       *   modules → 自定义组件（要注册进 GZH.MODULES，否则引擎不认识这个盒子）
+       *   hidden  → 左栏不显示某个组件
+       *
+       * ⚠️ base 一定要写回 t.base：render 取值是 Object.assign(tokens, base, block)，
+       * base 优先级高于 tokens，写进 tokens 会被原样盖掉 ——
+       * 「改了间距没反应」就是这么来的。 */
+      var overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {} };
+      var LS_OV = 'gzh.overrides.';
+
+      function loadOverrides(id) {
+        overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {} };
+        var raw = id ? lsGet(LS_OV + id) : null;
+        if (raw) { try { overrides = Object.assign(overrides, JSON.parse(raw)); } catch (e) {} }
+        syncCustomModules();
+      }
+      function saveOverrides() {
+        if (themeSel.value) lsSet(LS_OV + themeSel.value, JSON.stringify(overrides));
+      }
+      function ovCount() {
+        return Object.keys(overrides.tokens).length + Object.keys(overrides.base).length
+          + Object.keys(overrides.tpl).length + Object.keys(overrides.item).length
+          + Object.keys(overrides.modules).length + Object.keys(overrides.hidden).length;
+      }
 
       function currentTheme() {
         var base = themes[themeSel.value];
-        if (!base || !Object.keys(overrides).length) return base;
+        if (!base || !ovCount()) return base;
         var t = JSON.parse(JSON.stringify(base));
-        Object.keys(overrides).forEach(function (k) { t.tokens[k] = overrides[k]; });
+        Object.keys(overrides.tokens).forEach(function (k) { t.tokens[k] = overrides.tokens[k]; });
+        Object.keys(overrides.base).forEach(function (k) { t.base[k] = overrides.base[k]; });
+        Object.keys(overrides.tpl).forEach(function (role) {
+          if (t.components && t.components[role]) t.components[role].tpl = overrides.tpl[role];
+        });
+        Object.keys(overrides.item).forEach(function (role) {
+          if (t.components && t.components[role]) t.components[role].item = overrides.item[role];
+        });
         return t;
       }
 
+      /* ---------- 自定义组件 ----------
+       *
+       * 骨架（这个盒子怎么取值）一直写在代码里，所以以前只能在已有的十几个挑。
+       * 这里按 ir.js 的规矩现场造 grammar 塞进 GZH.MODULES —— ir.js 只读这张表，
+       * 一行都不用改。三种取值方式覆盖了绝大多数需求，都是从内置组件抄来的形状。 */
+      var GRAMMAR_PRESETS = {
+        whole: { kind: 'container', static: {}, map: { label: 'label', text: 'join' } },
+        kv: { kind: 'container', kv: true, static: {}, map: { label: 'label', text: 'join' } },
+        list: { kind: 'container', static: {}, map: { label: 'label', items: 'lines' } }
+      };
+      // 主题自带的 + 本机新建的，合并后的完整自定义组件表
+      function effectiveModules() {
+        var t = themes[themeSel && themeSel.value];
+        return Object.assign({}, (t && t.modules) || {}, overrides.modules || {});
+      }
+
+      var CUSTOM_ROLES = [];
+
+      function syncCustomModules() {
+        // 先撤掉上一次注入的，否则删掉的组件会阴魂不散
+        CUSTOM_ROLES.forEach(function (r) {
+          var M = window.GZH && window.GZH.MODULES;
+          if (M && M[r] && M[r].__custom) delete M[r];
+          // FALLBACK 是 modules.js 加载时拍的快照，后注册的组件必须自己同步，
+          // 否则 renderBlock 找不到 comp → 返回空字符串，盒子会**静默消失**
+          if (window.GZH && window.GZH.FALLBACK) delete window.GZH.FALLBACK[r];
+        });
+        CUSTOM_ROLES = [];
+        if (!window.GZH || !window.GZH.MODULES) return;
+
+        // 两个来源都算：主题自带（导入别人的主题时会带过来）+ 你在这台机器上新建的。
+        // 后写的优先，方便你对自带的那个再做修改。
+        var baseT = themes[themeSel && themeSel.value];
+        var merged = Object.assign({}, (baseT && baseT.modules) || {}, overrides.modules || {});
+
+        Object.keys(merged).forEach(function (role) {
+          var m = merged[role];
+          var t = baseT;
+          var srcComp = (t && t.components && t.components[m.from]) || null;
+          var srcMod = window.GZH.MODULES[m.from] || {};
+          var fb = srcMod.fallback || {};
+          // 模板优先级：你自己改过的 > 起点组件在这套主题里的模板 > 起点组件的内置兜底
+          var tpl = overrides.tpl[role] || (srcComp && srcComp.tpl) || fb.tpl || '';
+          var item = overrides.item[role] || (srcComp && srcComp.item) || fb.item || '';
+
+          var snippet = m.kind === 'list'
+            ? ':::' + role + ' ' + m.name + '\n- 第一条\n- 第二条\n- 第三条\n:::\n'
+            : m.kind === 'kv'
+              ? ':::' + role + ' ' + m.name + '\nsubtitle: 副标题\n\n这里写正文。\n:::\n'
+              : ':::' + role + ' ' + m.name + '\n这里写正文。\n:::\n';
+
+          var entry = {
+            __custom: true,
+            ui: { label: m.name, group: m.group || '正文', snippet: snippet, hint: ':::' + role },
+            grammar: JSON.parse(JSON.stringify(GRAMMAR_PRESETS[m.kind] || GRAMMAR_PRESETS.whole)),
+            fallback: { tpl: tpl }
+          };
+          if (item) entry.fallback.item = item;
+          if (m.source) entry.fallback.source = m.source;
+          window.GZH.MODULES[role] = entry;
+          if (window.GZH.FALLBACK) window.GZH.FALLBACK[role] = entry.fallback;
+          CUSTOM_ROLES.push(role);
+        });
+      }
+
+      /* ---------- 占位图：按当前主题现场画 ----------
+       *
+       * 以前三张占位图是固定 PNG，底色用的是蓝色主题那套（写死在
+       * check/make_placeholders.py 里），换到雾青主题就特别刺眼。
+       * 现在在浏览器里用 Canvas 画 —— 零依赖，而且配色面板一动它跟着变。
+       *
+       * 为什么不是直接换图：图里的字是画在位图上的，改 HTML 没用；
+       * 而微信要求必须是真图片，读者才能在公众号里单击选中后替换成自己的图。 */
+      var PH_SPEC = {
+        cover: { w: 1080, h: 460, title: '封面占位图', line1: '这里是文章封面', line2: '公众号里单击选中 → 上传你的图' },
+        image: { w: 1080, h: 720, title: '配图占位', line1: '这里放配图', line2: '公众号里单击选中 → 上传你的图' },
+        video: { w: 1080, h: 608, title: '视频占位', line1: '这里放视频封面', line2: '公众号里插入视频后替换' }
+      };
+      var phCache = { key: '', data: {} };
+
+      function phColors(theme) {
+        var tk = (theme && theme.tokens) || {};
+        return {
+          bg: tk.accentSoft || '#eff6ff',
+          border: tk.accentTint || '#bfdbfe',
+          accent: tk.accent || '#2563eb',
+          muted: tk.textMuted || '#64748b'
+        };
+      }
+
+      function drawPlaceholder(kind, theme) {
+        var sp = PH_SPEC[kind];
+        if (!sp) return '';
+        var c = phColors(theme);
+        // 尺寸跟着引擎里那套走（w/h/ratio 是渲染时算 padding-top 用的），别自造一套
+        var spec0 = (window.GZH.placeholders && window.GZH.placeholders[kind]) || {};
+        var W = spec0.w || sp.w, H = spec0.h || sp.h;
+        var cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        var g = cv.getContext('2d');
+        if (!g) return '';
+
+        g.fillStyle = c.bg; g.fillRect(0, 0, W, H);
+
+        // 外框虚线
+        g.strokeStyle = c.border; g.lineWidth = 3; g.setLineDash([14, 10]);
+        g.strokeRect(16, 16, W - 32, H - 32);
+        g.setLineDash([]);
+
+        // 对角线 —— 让人一眼看出「这是张空图」
+        g.strokeStyle = c.border; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(16, 16); g.lineTo(W - 16, H - 16);
+        g.moveTo(W - 16, 16); g.lineTo(16, H - 16); g.stroke();
+
+        var cx = W / 2, cy = H / 2;
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        // 中间挖一块底色，保证文字在任何笔色下都看得清
+        g.fillStyle = c.bg; g.fillRect(cx - 420, cy - 96, 840, 192);
+        g.strokeStyle = c.border; g.lineWidth = 2; g.strokeRect(cx - 420, cy - 96, 840, 192);
+
+        g.fillStyle = c.accent;
+        g.font = 'bold 52px "PingFang SC","Microsoft YaHei",sans-serif';
+        g.fillText(sp.line1, cx, cy - 34);
+        g.fillStyle = c.muted;
+        g.font = '34px "PingFang SC","Microsoft YaHei",sans-serif';
+        g.fillText(sp.line2, cx, cy + 32);
+
+        // 左上角小标签 + 尺寸
+        g.fillStyle = c.accent;
+        g.font = 'bold 30px "PingFang SC","Microsoft YaHei",sans-serif';
+        g.textAlign = 'left';
+        g.fillText(sp.title, 44, 60);
+        g.fillStyle = c.muted;
+        g.font = '26px monospace';
+        g.textAlign = 'right';
+        g.fillText(W + ' × ' + H, W - 44, H - 44);
+
+        return cv.toDataURL('image/png');
+      }
+
+      /* 每次渲染前刷一遍。把主题里参与配色的几个值拼成 key，
+       * 值没变就直接吃缓存 —— Canvas 画三张图虽然只要几十毫秒，
+       * 但拖滑块时每一帧都重画没必要。 */
+      function refreshPlaceholders(theme) {
+        if (!theme || !window.GZH || !window.GZH.placeholders) return;
+        var c = phColors(theme);
+        var key = [c.bg, c.border, c.accent, c.muted].join('|');
+        if (phCache.key === key) {
+          Object.keys(phCache.data).forEach(function (k) {
+            window.GZH.placeholders[k].uri = phCache.data[k];
+          });
+          return;
+        }
+        var data = {};
+        try {
+          Object.keys(PH_SPEC).forEach(function (kind) {
+            var uri = drawPlaceholder(kind, theme);
+            if (uri) {
+              data[kind] = uri;
+              if (window.GZH.placeholders[kind]) window.GZH.placeholders[kind].uri = uri;
+            }
+          });
+        } catch (e) {
+          return;   // canvas 用不了（极少见）就继续用原来的固定图，不打断渲染
+        }
+        phCache = { key: key, data: data };
+      }
+
       function render() {
+        /* 自定义组件的模板走的是 FALLBACK 那条路（主题里没有它的 components 条目），
+         * 所以每次渲染前必须把最新的 overrides 同步进 GZH.MODULES / FALLBACK，
+         * 否则「改了模板预览不变」—— 会让人以为编辑器坏了。 */
+        syncCustomModules();
+
         var md = mdEl.value;
         if (!md.trim()) {
           previewEl.innerHTML = '';
@@ -860,13 +1145,15 @@ footer: 文末引导语
 
         var theme = currentTheme();
         if (!theme) {
-          previewEl.innerHTML = '';
           barEl.innerHTML = '';
           issuesEl.innerHTML = '<div class="issue">还没有可用的主题。</div>';
           currentHTML = '';
           copyBtn.disabled = true;
           return;
         }
+
+        // 占位图按当前主题配色重画 —— 放在渲染前，ir.js 取的就是这张
+        refreshPlaceholders(theme);
 
         var ast, ir, html;
         // 发布面板要从 IR 里取标题/作者，存一份引用，避免为了取标题再解析一次稿子
@@ -1002,7 +1289,11 @@ footer: 文末引导语
         clearTimeout(debounce);
         debounce = setTimeout(render, 220);
       });
-      themeSel.addEventListener('change', render);
+      themeSel.addEventListener('change', function () {
+        loadOverrides(themeSel.value);   // 每套主题各自的改动分开存，互不干扰
+        buildModules();
+        render();
+      });
       copyBtn.addEventListener('click', copy);
       $('sampleBtn').addEventListener('click', function () {
         mdEl.value = $('sampleMd').textContent.trim();
@@ -1026,12 +1317,51 @@ footer: 文末引导语
         ['accentLine', '装饰线', '分隔线、渐变端点']
       ];
 
-      var colorMask = $('colorMask'), colorBody = $('colorBody');
+      var colorMask = $('colorMask'), colorBody = $('colorBody'), curTab = 'color';
 
-      function openColor() {
+      /* 尺度面板直接对着主题的 base 块 —— render.js 取值是
+       * Object.assign(tokens, base, block)，这些本来就是数据字段，改完即时生效。 */
+      var FONT_OPTS = [
+        ['-apple-system,system-ui,\'PingFang SC\',\'Hiragino Sans GB\',\'Microsoft YaHei\',sans-serif', '系统黑体（苹方 / 雅黑）'],
+        ['\'IBM Plex Sans\',-apple-system,\'PingFang SC\',\'Microsoft YaHei\',sans-serif', 'IBM Plex Sans'],
+        ['Georgia,\'Songti SC\',\'SimSun\',serif', '衬线宋体'],
+        ['Optima,\'PingFang SC\',\'Microsoft YaHei\',sans-serif', 'Optima 人文体']
+      ];
+
+      var SCALE_KEYS = [
+        ['fontSize', '正文字号', 'range', 13, 19, 0.5, 'px', '手机屏通常是 15–16px'],
+        ['fontSizeTitle', '标题字号', 'range', 18, 32, 1, 'px', '章节大标题'],
+        ['lineHeight', '行距', 'range', 1.4, 2.4, 0.05, '', '公众号常见 1.75–1.95'],
+        ['letterSpacing', '字间距', 'range', 0, 3, 0.1, 'px', '超过 1px 会显得松散'],
+        ['paraGap', '段间距', 'range', 0, 40, 1, 'px', '段落之间'],
+        ['chapterGap', '章节间距', 'range', 0, 80, 2, 'px', '章节之间'],
+        ['cardGap', '卡片间距', 'range', 0, 60, 1, 'px', '卡片、组件之间'],
+        ['itemGap', '条目间距', 'range', 0, 30, 1, 'px', '列表条目之间'],
+        ['align', '对齐', 'select', 0, 0, 0, '', '正文默认两端对齐'],
+        ['fontFamily', '字体', 'select', 0, 0, 0, '', '微信端最终以读者手机字体为准']
+      ];
+
+      /* 面板本体：一个弹层三个页签。curTab 决定渲染哪一页，
+       * 每次重绘都按当前 overrides 取值，所以「改了立刻看得见」。 */
+      function openColor(tab) {
+        if (!currentTheme()) { toast('先选一个主题'); return; }
+        curTab = tab || curTab || 'color';
+        drawTabs();
+        if (curTab === 'color') tabColor();
+        else if (curTab === 'scale') tabScale();
+        else tabComp();
+        colorMask.classList.add('show');
+      }
+
+      function drawTabs() {
+        Array.prototype.forEach.call($('colorTabs').querySelectorAll('.tab'), function (b) {
+          b.classList.toggle('on', b.getAttribute('data-tab') === curTab);
+        });
+      }
+
+      /* ---------- 页签①：配色 ---------- */
+      function tabColor() {
         var t = currentTheme();
-        if (!t) { toast('先选一个主题'); return; }
-
         var html = '<p style="margin:0 0 12px;color:#6b7280;">改完右侧预览会立刻变。'
           + '满意了就点「导出主题文件」，拿到的是一个能直接用的主题文件。</p>'
           + '<p style="margin:0 0 12px;color:#92400e;">卡片和渐变线的底色由「浅底」决定，'
@@ -1039,7 +1369,7 @@ footer: 文末引导语
 
         COLOR_KEYS.forEach(function (row) {
           var key = row[0], label = row[1], note = row[2];
-          var val = (overrides[key] || t.tokens[key] || '#000000');
+          var val = (overrides.tokens[key] || t.tokens[key] || '#000000');
           html += '<div class="crow">'
             + '<span class="crow-k"><b>' + label + '</b><em>' + note + '</em></span>'
             + '<input type="color" value="' + val + '" data-k="' + key + '">'
@@ -1047,28 +1377,373 @@ footer: 文末引导语
             + '</div>';
         });
 
-        html += '<div class="crow crow-id">'
-          + '<span class="crow-k"><b>导出为</b><em>主题 id / 名称，随便起</em></span>'
-          + '<input type="text" id="newThemeId" value="' + suggestId() + '">'
-          + '<input type="text" id="newThemeName" value="' + suggestName() + '">'
-          + '</div>';
-
+        html += exportRow();
         colorBody.innerHTML = html;
 
         Array.prototype.forEach.call(colorBody.querySelectorAll('input[type=color]'), function (inp) {
           inp.addEventListener('input', function () {
             var k = inp.getAttribute('data-k');
-            overrides[k] = inp.value;
+            overrides.tokens[k] = inp.value;
             var vEl = colorBody.querySelector('.crow-v[data-v="' + k + '"]');
             if (vEl) vEl.textContent = inp.value;
+            saveOverrides();
             render();
           });
         });
+      }
 
-        colorMask.classList.add('show');
+      // 「导出为 xxx」这一行，三个页签共用
+      function exportRow() {
+        return '<div class="crow crow-id">'
+          + '<span class="crow-k"><b>导出为</b><em>主题 id / 名称，随便起</em></span>'
+          + '<input type="text" id="newThemeId" value="' + suggestId() + '">'
+          + '<input type="text" id="newThemeName" value="' + suggestName() + '">'
+          + '</div>';
       }
 
       function closeColor() { colorMask.classList.remove('show'); }
+
+      /* ---------- 页签②：尺度 ----------
+       * 对着主题 JSON 的 base 块。以前这些值只躺在文件里，
+       * 想改只能手改 JSON 再重编译 —— 现在是一排滑块。 */
+      function tabScale() {
+        var t = currentTheme();
+        if (!t) return;
+        var base = t.base || {};
+
+        var html = '<p style="margin:0 0 12px;color:#6b7280;">字号、行距、间距、对齐 —— '
+          + '这些都是主题的尺度字段，拖一下右侧预览立刻变。</p>';
+
+        SCALE_KEYS.forEach(function (row) {
+          var k = row[0], label = row[1], type = row[2], unit = row[6], note = row[7];
+          var cur = overrides.base[k] !== undefined ? overrides.base[k] : base[k];
+          if (cur === undefined) cur = '';
+          html += '<div class="crow">'
+            + '<span class="crow-k"><b>' + label + '</b><em>' + note + '</em></span>';
+
+          if (type === 'range') {
+            var num = parseFloat(cur);
+            if (!num && num !== 0) num = row[3];
+            html += '<input type="range" min="' + row[3] + '" max="' + row[4] + '" step="' + row[5]
+              + '" value="' + num + '" data-k="' + k + '" data-unit="' + unit + '" style="width:200px;">'
+              + '<code class="crow-v" data-v="' + k + '">' + cur + '</code>';
+          } else {
+            var opts = k === 'align'
+              ? [['justify', '两端对齐'], ['left', '左对齐'], ['center', '居中']] : FONT_OPTS;
+            html += '<select data-k="' + k + '" style="width:230px;">';
+            opts.forEach(function (o) {
+              html += '<option value="' + String(o[0]).replace(/"/g, '&quot;') + '"'
+                + (String(cur) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+            });
+            html += '</select>';
+          }
+          html += '</div>';
+        });
+
+        html += exportRow();
+        colorBody.innerHTML = html;
+
+        Array.prototype.forEach.call(colorBody.querySelectorAll('input[type=range]'), function (inp) {
+          inp.addEventListener('input', function () {
+            var k = inp.getAttribute('data-k');
+            var v = inp.value + (inp.getAttribute('data-unit') || '');
+            overrides.base[k] = v;
+            var vEl = colorBody.querySelector('.crow-v[data-v="' + k + '"]');
+            if (vEl) vEl.textContent = v;
+            saveOverrides(); render();
+          });
+        });
+        Array.prototype.forEach.call(colorBody.querySelectorAll('select'), function (sel) {
+          sel.addEventListener('change', function () {
+            overrides.base[sel.getAttribute('data-k')] = sel.value;
+            saveOverrides(); render();
+          });
+        });
+      }
+
+      /* ---------- 页签③：组件 ----------
+       *
+       * 两件事：
+       *   改模板 —— 主题里每个组件就是一段 HTML 字符串，摊开来改，右边即时预览、下面实时体检。
+       *   造组件 —— 骨架（这个盒子怎么取值）以前写在 modules.js 代码里，只能在已有的十几个挑。
+       *             这里现场按规矩生成一条 grammar 塞进 GZH.MODULES 就完了，ir.js 不用改。
+       */
+      var cmpSel = null;
+
+      function compRoles() {
+        var t = currentTheme() || themes[themeSel.value] || {};
+        var built = Object.keys(t.components || {});
+        var mine = Object.keys(effectiveModules());
+        return built.concat(mine.filter(function (r) { return built.indexOf(r) < 0; }));
+      }
+
+      function roleName(role) {
+        var m = window.GZH.MODULES && window.GZH.MODULES[role];
+        if (m && m.ui && m.ui.label) return m.ui.label;
+        var mine = effectiveModules()[role];
+        return (mine && mine.name) || role;
+      }
+
+      // 当前生效的模板：你改过的 > 主题自带的 > 引擎内置兜底
+      function tplOf(role) {
+        if (overrides.tpl[role] !== undefined) return overrides.tpl[role];
+        var t = themes[themeSel.value];
+        var c = t && t.components && t.components[role];
+        if (c && c.tpl) return c.tpl;
+        var m = window.GZH.MODULES && window.GZH.MODULES[role];
+        return (m && m.fallback && m.fallback.tpl) || '';
+      }
+      function itemOf(role) {
+        if (overrides.item[role] !== undefined) return overrides.item[role];
+        var t = themes[themeSel.value];
+        var c = t && t.components && t.components[role];
+        if (c && c.item) return c.item;
+        var m = window.GZH.MODULES && window.GZH.MODULES[role];
+        return (m && m.fallback && m.fallback.item) || '';
+      }
+
+      function tabComp() {
+        var roles = compRoles();
+        if (!cmpSel || roles.indexOf(cmpSel) < 0) cmpSel = roles[0] || null;
+
+        var html = '<p style="margin:0 0 10px;color:#6b7280;">选一个组件直接改它的模板 —— '
+          + '下面即时预览、实时体检，改坏了点「恢复默认」。</p>'
+          + '<div class="cmp-row" style="margin-bottom:10px;">'
+          + '<button class="mini" id="cmpNewBtn">+ 新建组件</button>'
+          + '<span style="font-size:11px;color:#9ca3af;">组件＝稿子里 :::xxx 那个盒子长什么样</span>'
+          + '</div>'
+          + '<div class="cmp-new" id="cmpNewBox">' + cmpNewFormHTML() + '</div>'
+          + '<div class="cmp-wrap"><div class="cmp-list">';
+
+        roles.forEach(function (r) {
+          html += '<div class="cmp-item' + (r === cmpSel ? ' on' : '') + '" data-role="' + r + '">'
+            + '<span class="cn">' + escHtml(roleName(r)) + '</span>'
+            + (effectiveModules()[r] ? '<span class="tagx">自建</span>' : '')
+            + (overrides.hidden[r] ? '<span class="tagx hide">隐藏</span>' : '')
+            + (overrides.tpl[r] !== undefined ? '<span class="tagx">改过</span>' : '')
+            + '</div>';
+        });
+
+        html += '</div><div class="cmp-main">'
+          + (cmpSel ? cmpEditorHTML(cmpSel) : '<div class="cmp-prev-empty">从左边选一个组件。</div>')
+          + '</div></div>' + exportRow();
+
+        colorBody.innerHTML = html;
+        bindComp();
+        if (cmpSel) checkAndPreview(cmpSel);
+      }
+
+      function cmpEditorHTML(role) {
+        var item = itemOf(role);
+        var srcComp = (themes[themeSel.value] || {}).components || {};
+        var m = window.GZH.MODULES && window.GZH.MODULES[role];
+        var hasItem = !!(item || (srcComp[role] && srcComp[role].item) || (m && m.fallback && m.fallback.item));
+
+        return '<h4>' + escHtml(roleName(role)) + '<em>:::' + role + '</em>'
+          + '<span style="flex:1"></span>'
+          + '<button class="mini" data-act="hide" data-role="' + role + '">'
+          + (overrides.hidden[role] ? '取消隐藏' : '隐藏') + '</button>'
+          + '<button class="mini" data-act="reset" data-role="' + role + '">恢复默认</button>'
+          + (effectiveModules()[role]
+            ? '<button class="mini" data-act="del" data-role="' + role + '">删除组件</button>' : '')
+          + '</h4>'
+          + '<textarea class="cmp-tpl" id="cmpTpl" spellcheck="false">' + escHtml(tplOf(role)) + '</textarea>'
+          + (hasItem
+            ? '<div class="cmp-row"><label>列表项模板（每个 - 条目渲染成什么）</label></div>'
+            + '<textarea class="cmp-tpl" id="cmpItem" spellcheck="false" style="min-height:86px;">'
+            + escHtml(item) + '</textarea>' : '')
+          + '<div class="cmp-msg" id="cmpMsg"></div>'
+          + '<div class="cmp-row"><label>预览 · 按这个组件的样例内容渲染</label></div>'
+          + '<div class="cmp-prev" id="cmpPrev"></div>';
+      }
+
+      function bindComp() {
+        Array.prototype.forEach.call(colorBody.querySelectorAll('.cmp-item'), function (el) {
+          el.addEventListener('click', function () { cmpSel = el.getAttribute('data-role'); tabComp(); });
+        });
+
+        Array.prototype.forEach.call(colorBody.querySelectorAll('[data-act]'), function (b) {
+          b.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            var act = b.getAttribute('data-act'), role = b.getAttribute('data-role');
+
+            if (act === 'hide') {
+              if (overrides.hidden[role]) delete overrides.hidden[role];
+              else overrides.hidden[role] = true;
+              saveOverrides(); buildModules(); tabComp();
+              toast(overrides.hidden[role] ? '已从左栏隐藏，稿子里写了照样渲染' : '已恢复显示');
+            } else if (act === 'reset') {
+              delete overrides.tpl[role]; delete overrides.item[role];
+              saveOverrides(); render(); tabComp(); toast('已恢复默认模板');
+            } else if (act === 'del') {
+              if (!window.confirm('删除自建组件「' + roleName(role) + '」？\n'
+                + '稿子里的 :::' + role + ' 会降级成普通段落。')) return;
+              delete overrides.modules[role]; delete overrides.tpl[role]; delete overrides.item[role];
+              delete overrides.hidden[role];   // 组件都没了，隐藏标记留着只会误伤导出
+              // 主题自带的也要删，否则下一轮 sync 又会把它注册回来
+              var bt = themes[themeSel.value];
+              if (bt && bt.modules && bt.modules[role]) delete bt.modules[role];
+              saveOverrides(); syncCustomModules(); buildModules();
+              cmpSel = compRoles()[0] || null; tabComp(); render();
+              toast('已删除 :::' + role);
+            }
+          });
+        });
+
+        var ta = $('cmpTpl');
+        if (ta) ta.addEventListener('input', function () {
+          overrides.tpl[cmpSel] = ta.value; saveOverrides();
+          checkAndPreview(cmpSel); render();
+        });
+        var ti = $('cmpItem');
+        if (ti) ti.addEventListener('input', function () {
+          overrides.item[cmpSel] = ti.value; saveOverrides();
+          checkAndPreview(cmpSel); render();
+        });
+
+        var nb = $('cmpNewBtn');
+        if (nb) nb.addEventListener('click', function () {
+          var box = $('cmpNewBox');
+          if (!box) return;
+          box.classList.toggle('show');
+          if (box.classList.contains('show') && $('ncName')) $('ncName').focus();
+        });
+        var ncCancel = $('ncCancel');
+        if (ncCancel) ncCancel.addEventListener('click', function () {
+          $('cmpNewBox').classList.remove('show');
+        });
+        var ncOk = $('ncOk');
+        if (ncOk) ncOk.addEventListener('click', createCmp);
+      }
+
+      function cmpNewFormHTML() {
+        var src = [];
+        Object.keys(window.GZH.MODULES || {}).forEach(function (r) {
+          var m = window.GZH.MODULES[r];
+          if (m.__custom) return;
+          src.push('<option value="' + r + '">' + escHtml((m.ui && m.ui.label) || r) + '（' + r + '）</option>');
+        });
+        return '<div class="row"><span>组件名</span><input type="text" id="ncName" placeholder="结论卡"></div>'
+          + '<div class="row"><span>语法名</span><input type="text" id="ncRole" placeholder="verdict"></div>'
+          + '<em>稿子里写成 :::verdict … :::；只能用小写字母开头。不能和内置组件重名。</em>'
+          + '<div class="row"><span>内容怎么取</span><select id="ncKind">'
+          + '<option value="whole">整段正文（多数情况选这个）</option>'
+          + '<option value="kv">字段行 —— 盒子里写 key: value 当字段</option>'
+          + '<option value="list">列表 —— 每个 - 一行渲染成一条</option>'
+          + '</select></div>'
+          + '<div class="row"><span>复制谁当起点</span><select id="ncFrom">' + src.join('') + '</select></div>'
+          + '<em>挑一个长得最接近的，建好以后在上面随便改。</em>'
+          + '<div class="row" style="margin-left:84px;">'
+          + '<button class="mini" id="ncOk">创建</button>'
+          + '<button class="mini" id="ncCancel">取消</button></div>';
+      }
+
+      function createCmp() {
+        var name = (($('ncName') && $('ncName').value) || '').trim();
+        var role = (($('ncRole') && $('ncRole').value) || '').trim().toLowerCase()
+          .replace(/[^a-z0-9_-]/g, '');
+        var kind = $('ncKind') && $('ncKind').value;
+        var from = $('ncFrom') && $('ncFrom').value;
+
+        if (!role) { toast('语法名必填：小写字母，稿子里写成 :::名字'); return; }
+        if (!/^[a-z]/.test(role)) { toast('语法名要用小写字母开头'); return; }
+        if (window.GZH.MODULES[role] && !window.GZH.MODULES[role].__custom) {
+          toast('「' + role + '」是内置组件，换一个名字'); return;
+        }
+
+        var t = themes[themeSel.value] || {};
+        var srcComp = (t.components && t.components[from]) || null;
+        overrides.modules[role] = { name: name || role, group: '正文', kind: kind, from: from };
+        // 把起点的模板抄一份过来，否则新组件只能继承内置兜底，看起来和起点不像
+        if (srcComp && srcComp.tpl) overrides.tpl[role] = srcComp.tpl;
+        if (srcComp && srcComp.item) overrides.item[role] = srcComp.item;
+
+        saveOverrides(); syncCustomModules(); buildModules();
+        cmpSel = role; tabComp(); render();
+        toast('已建好 :::' + role + ' —— 左栏「正文」组里可以直接插入，模板在上面改');
+      }
+
+      /* 模板体检：把微信的红线和两个「最容易改坏」的地方当场指出来，
+       * 免得你粘进公众号才发现。 */
+      var WECHAT_BAN = [
+        ['<div', '&lt;div&gt; —— 微信一律过滤，容器只能用 &lt;section&gt;'],
+        ['class=', 'class 属性 —— 微信会擦掉，样式必须内联'],
+        ['id=', 'id 属性 —— 同上'],
+        ['position:', 'position 定位 —— 微信不支持'],
+        ['float:', 'float 浮动 —— 微信不支持'],
+        ['<script', '&lt;script&gt; 标签'],
+        ['<iframe', '&lt;iframe&gt; 标签'],
+        ['<style', '&lt;style&gt; 标签']
+      ];
+
+      function checkTpl(s) {
+        var bad = [], warn = [];
+        WECHAT_BAN.forEach(function (p) {
+          if (s.indexOf(p[0]) >= 0) bad.push(p[1]);
+        });
+        if (/\{\{/.test(s)) {
+          bad.push('还有没被替换的 <code>{{…}}</code> —— 变量名叫错了会原样出现在正文里');
+        }
+        var grad = (s.match(/135deg/g) || []).length;
+        if (grad) warn.push(grad + ' 处 135° 渐变 —— 微信深色模式下卡片里的字可能变淡');
+        if (!/<section/.test(s)) warn.push('没有 <code>&lt;section&gt;</code> —— 微信的布局容器，缺了间距会串');
+        var bare = s.match(/<(p|h[1-6])\b[^>]*>(?:(?!<span)[\s\S])*?[^\s<][\s\S]*?<\/\1>/);
+        if (bare && bare[0].indexOf('<span') < 0) {
+          warn.push('有文字没包进 <code>&lt;span leaf=""&gt;</code> —— 粘贴后可能被编辑器擦掉');
+        }
+
+        var html = '';
+        if (bad.length) {
+          html = '<b style="color:#991b1b;">微信会拦：</b><ul>'
+            + bad.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+        }
+        if (warn.length) {
+          html += '<b style="color:#92400e;">留意：</b><ul>'
+            + warn.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+        }
+        if (!bad.length && !warn.length) html = '<span style="color:#065f46;">✓ 没发现微信红线</span>';
+        return html;
+      }
+
+      function checkAndPreview(role) {
+        var el = $('cmpMsg');
+        if (el) el.innerHTML = checkTpl(($('cmpTpl') && $('cmpTpl').value) || '');
+        previewComp(role);
+      }
+
+      /* 用一个样例 block 渲染这一个组件 —— 比看 HTML 直观得多。
+       * 样例内容直接取注册表里的 snippet，所以「这个盒子在稿子里怎么用」也是现成的示范。 */
+      function previewComp(role) {
+        var el = $('cmpPrev');
+        if (!el) return;
+        var tpl = ($('cmpTpl') && $('cmpTpl').value) || '';
+        var it = $('cmpItem') ? $('cmpItem').value : '';
+
+        var t = JSON.parse(JSON.stringify(currentTheme() || themes[themeSel.value]));
+        t.components = t.components || {};
+        t.components[role] = t.components[role] || {};
+        t.components[role].tpl = tpl;
+        if (it) t.components[role].item = it;
+
+        var m = window.GZH.MODULES && window.GZH.MODULES[role];
+        var md = (m && m.ui && m.ui.snippet) || '';
+        try {
+          var ir = md ? window.GZH.toIR(window.GZH.parse(md)) : null;
+          var blk = null;
+          ((ir && ir.blocks) || []).forEach(function (b) {
+            if (!blk && b.role === role) blk = b;
+          });
+          if (!blk) {
+            el.innerHTML = '<div class="cmp-prev-empty">这个组件没有样例内容 —— '
+              + '改完看右侧全文预览就行。</div>';
+            return;
+          }
+          el.innerHTML = window.GZH.renderBlock(t, blk);
+        } catch (e) {
+          el.innerHTML = '<div class="cmp-prev-empty" style="color:#991b1b;">预览失败：'
+            + escHtml(e.message) + '</div>';
+        }
+      }
 
       function suggestId() {
         var base = themeSel.value || 'theme';
@@ -1079,11 +1754,14 @@ footer: 文末引导语
         return (t && t.name ? t.name : '主题') + '（自定义）';
       }
 
+      // 「重置本页」只清当前页签那一类改动 —— 改坏了色没必要把建好的组件一起赔进去
       function resetColor() {
-        overrides = {};
-        render();
-        openColor();
-        toast('已恢复为「' + (currentTheme().name || '') + '」原本的配色');
+        if (curTab === 'scale') overrides.base = {};
+        else if (curTab === 'comp') { overrides.tpl = {}; overrides.item = {}; overrides.modules = {}; overrides.hidden = {}; }
+        else overrides.tokens = {};
+        saveOverrides(); syncCustomModules(); buildModules(); render();
+        openColor(curTab);
+        toast('已恢复「' + ((currentTheme() || {}).name || '') + '」本页的原始设置');
       }
 
       /* 导出的是一个「放进 themes/ 就能用」的 .js 文件，格式与
@@ -1101,8 +1779,33 @@ footer: 文末引导语
         var out = JSON.parse(JSON.stringify(t));
         out.id = id;
         out.name = name;
-        out.derivedFrom = (themeSel.value || '') + (Object.keys(overrides).length ? '（改过配色）' : '');
-        out.note = '由 App 配色面板导出。放进 themes/ 目录刷新即可，无需编译。';
+
+        /* 四类改动落进主题的位置各不相同，这里逐个固化：
+         *   tokens/base/tpl/item → currentTheme() 已经写进 out 了
+         *   modules（自建组件） → 要额外带出去，否则别人导入后 :::verdict 只是个普通段落
+         *   hidden（隐藏的组件）→ 从 components 里删掉，这套主题就当它不存在 */
+        Object.keys(effectiveModules()).forEach(function (role) {
+          out.components = out.components || {};
+          // 自建组件没有"主题自带的模板"，但模板必须跟着走，否则渲染会退回内置兜底、
+          // 看起来跟你改的不一样
+          out.components[role] = out.components[role] || {};
+          out.components[role].tpl = tplOf(role);
+          if (itemOf(role)) out.components[role].item = itemOf(role);
+        });
+        if (Object.keys(effectiveModules()).length) out.modules = effectiveModules();
+        Object.keys(overrides.hidden || {}).forEach(function (role) {
+          // 自建组件不受隐藏影响：那是你亲手造的，导出就该带着
+          if (out.components && !effectiveModules()[role]) delete out.components[role];
+        });
+
+        var changed = [];
+        if (Object.keys(overrides.tokens).length) changed.push('配色');
+        if (Object.keys(overrides.base).length) changed.push('尺度');
+        if (Object.keys(overrides.tpl).length || Object.keys(overrides.item).length) changed.push('模板');
+        if (Object.keys(effectiveModules()).length) changed.push('自建组件');
+        if (Object.keys(overrides.hidden).length) changed.push('隐藏了组件');
+        out.derivedFrom = (themeSel.value || '') + (changed.length ? '（改过' + changed.join('/') + '）' : '');
+        out.note = '由 App 主题编辑面板导出。放进 themes/ 目录刷新即可，无需编译。';
 
         // 自己这套立刻可用：注册进 GZH_THEMES 并写进 localStorage，刷新后还在下拉里。
         // （不能只靠「丢进 themes/ 目录」—— 动态加载看的是 GZH_THEME_ORDER，
@@ -1115,7 +1818,8 @@ footer: 文末引导语
 
         buildThemeOptions();
         themeSel.value = id;
-        overrides = {};      // 改动已固化进新主题，覆盖层清掉
+        overrides = { tokens: {}, base: {}, tpl: {}, item: {}, modules: {}, hidden: {} };  // 改动已固化进新主题
+        saveOverrides(); syncCustomModules(); buildModules();
         render();
 
         // 下载的这份是给别人的：对方用「导入主题」打开即可，不用装 Python 重编译
@@ -1168,14 +1872,18 @@ footer: 文末引导语
 
         buildThemeOptions();
         themeSel.value = added[added.length - 1];
-        overrides = {};
+        loadOverrides(themeSel.value);   // 你自己导出过的改动会跟着回来
+        buildModules();
         render();
         toast('已导入「' + (window.GZH_THEMES[themeSel.value].name || themeSel.value) + '」');
       }
 
-      $('colorBtn').addEventListener('click', openColor);
+      $('colorBtn').addEventListener('click', function () { openColor(curTab); });
       $('colorClose') && $('colorClose').addEventListener('click', closeColor);
       colorMask.addEventListener('click', function (e) { if (e.target === colorMask) closeColor(); });
+      Array.prototype.forEach.call($('colorTabs').querySelectorAll('.tab'), function (b) {
+        b.addEventListener('click', function () { openColor(b.getAttribute('data-tab')); });
+      });
       $('colorReset').addEventListener('click', resetColor);
       $('colorExport').addEventListener('click', exportTheme);
       $('colorImport').addEventListener('click', function () { $('themeFile').click(); });
@@ -1754,11 +2462,11 @@ footer: 文末引导语
         });
       });
 
-      buildModules();
-
       loadThemeScripts(window.GZH_THEME_ORDER || [], function (missing) {
         restoreImported();
         buildThemeOptions();
+        loadOverrides(themeSel.value);   // 自定义组件要在这里注册完，才能进左栏
+        buildModules();
         render();
         if (missing.length) toast('有几个主题没加载到：' + missing.join('、'));
       });
